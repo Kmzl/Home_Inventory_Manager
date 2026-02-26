@@ -80,6 +80,8 @@ export default function HomePage() {
   const [itemLocations, setItemLocations] = useState<Record<number, Array<{ location_id: number; quantity: number; path: string | null }>>>({});
   const [distForm, setDistForm] = useState<{ itemId: number; locationId: string; quantity: string } | null>(null);
   const [importText, setImportText] = useState("");
+  const [importMode, setImportMode] = useState<"accumulate" | "skip" | "new">("accumulate");
+  const [importLocationId, setImportLocationId] = useState("");
   const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
   const [importStats, setImportStats] = useState<{ successCount: number; errorCount: number } | null>(null);
   const [staleItems, setStaleItems] = useState<StaleItem[]>([]);
@@ -346,7 +348,11 @@ export default function HomePage() {
     const res = await fetch(`${API_BASE}/api/import/preview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: importText })
+      body: JSON.stringify({
+        text: importText,
+        mode: importMode,
+        primaryLocationId: importLocationId ? Number(importLocationId) : null
+      })
     });
     if (!res.ok) return setError("预览失败");
     const json = await res.json();
@@ -359,7 +365,11 @@ export default function HomePage() {
     const res = await fetch(`${API_BASE}/api/import/commit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: importText })
+      body: JSON.stringify({
+        text: importText,
+        mode: importMode,
+        primaryLocationId: importLocationId ? Number(importLocationId) : null
+      })
     });
     if (!res.ok) return setError("导入失败");
     const json = await res.json();
@@ -367,7 +377,7 @@ export default function HomePage() {
     setImportPreview([]);
     setImportStats(null);
     await loadData();
-    alert(`导入完成：成功 ${json.success} 条，失败 ${json.failed} 条`);
+    alert(`导入完成：成功 ${json.success} 条，跳过 ${json.skipped ?? 0} 条，失败 ${json.failed} 条`);
   };
 
   const createLocation = async (e: FormEvent) => {
@@ -500,6 +510,19 @@ export default function HomePage() {
       <section className="card">
         <h2>批量导入</h2>
         <p className="item-meta">每行：名称,数量,分类,备注（支持中英文逗号，数量可缺省默认1）</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+          <select value={importMode} onChange={(e) => setImportMode(e.target.value as "accumulate" | "skip" | "new") }>
+            <option value="accumulate">重复项累加数量</option>
+            <option value="skip">重复项跳过</option>
+            <option value="new">重复项仍新增</option>
+          </select>
+          <select value={importLocationId} onChange={(e) => setImportLocationId(e.target.value)}>
+            <option value="">导入主位置（可选）</option>
+            {locations.map((l) => (
+              <option key={l.id} value={String(l.id)}>{l.path || l.name}</option>
+            ))}
+          </select>
+        </div>
         <textarea
           value={importText}
           onChange={(e) => setImportText(e.target.value)}
