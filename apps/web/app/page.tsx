@@ -377,7 +377,11 @@ export default function HomePage() {
             <li className="item-row" key={l.id}>
               <div>
                 <strong>L{l.level}</strong> · {l.path || l.name}
+                <div className="item-meta">NFC URL: /nfc/{l.id}</div>
               </div>
+              <a href={`/nfc/${l.id}`} target="_blank" rel="noreferrer">
+                <button className="secondary">打开 NFC 页</button>
+              </a>
             </li>
           ))}
         </ul>
