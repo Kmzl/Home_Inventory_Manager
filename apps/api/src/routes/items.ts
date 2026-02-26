@@ -6,7 +6,12 @@ const createItemSchema = z.object({
   category: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
   primaryLocationId: z.number().int().positive().optional().nullable(),
-  quantity: z.number().int().positive().default(1)
+  quantity: z.number().int().positive().default(1),
+  expiryDate: z.string().optional().nullable(),
+  openedAt: z.string().optional().nullable(),
+  validDaysAfterOpen: z.number().int().positive().optional().nullable(),
+  remindDays: z.number().int().positive().optional().nullable(),
+  lowStockThreshold: z.number().int().min(0).optional().nullable()
 });
 
 const updateItemSchema = z.object({
@@ -14,7 +19,12 @@ const updateItemSchema = z.object({
   category: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
   primaryLocationId: z.number().int().positive().optional().nullable(),
-  quantity: z.number().int().positive().optional()
+  quantity: z.number().int().positive().optional(),
+  expiryDate: z.string().optional().nullable(),
+  openedAt: z.string().optional().nullable(),
+  validDaysAfterOpen: z.number().int().positive().optional().nullable(),
+  remindDays: z.number().int().positive().optional().nullable(),
+  lowStockThreshold: z.number().int().min(0).optional().nullable()
 });
 
 function ensureCategory(app: FastifyInstance, name: string | null | undefined): number | null {
@@ -82,8 +92,16 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
 
     const result = app.db
       .prepare(
-        `INSERT INTO items (name, category, category_id, location, primary_location_id, quantity, note, updated_at)
-         VALUES (@name,@category,@categoryId,@location,@primaryLocationId,@quantity,@note,datetime('now'))`
+        `INSERT INTO items (
+          name, category, category_id, location, primary_location_id, quantity, note,
+          expiry_date, opened_at, valid_days_after_open, remind_days, low_stock_threshold,
+          updated_at
+        )
+         VALUES (
+          @name,@category,@categoryId,@location,@primaryLocationId,@quantity,@note,
+          @expiryDate,@openedAt,@validDaysAfterOpen,@remindDays,@lowStockThreshold,
+          datetime('now')
+         )`
       )
       .run({
         name: body.name,
@@ -92,7 +110,12 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
         location: locationPath,
         primaryLocationId: body.primaryLocationId ?? null,
         quantity: body.quantity,
-        note: body.note ?? null
+        note: body.note ?? null,
+        expiryDate: body.expiryDate ?? null,
+        openedAt: body.openedAt ?? null,
+        validDaysAfterOpen: body.validDaysAfterOpen ?? null,
+        remindDays: body.remindDays ?? 7,
+        lowStockThreshold: body.lowStockThreshold ?? null
       });
 
     const itemId = Number(result.lastInsertRowid);
@@ -108,7 +131,20 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
     const patch = updateItemSchema.parse(request.body);
 
     const existing = app.db.prepare(`SELECT * FROM items WHERE id = ?`).get(params.id) as
-      | { id: number; name: string; category: string | null; note: string | null; quantity: number; primary_location_id: number | null; deleted_at: string | null }
+      | {
+          id: number;
+          name: string;
+          category: string | null;
+          note: string | null;
+          quantity: number;
+          primary_location_id: number | null;
+          deleted_at: string | null;
+          expiry_date: string | null;
+          opened_at: string | null;
+          valid_days_after_open: number | null;
+          remind_days: number;
+          low_stock_threshold: number | null;
+        }
       | undefined;
 
     if (!existing || existing.deleted_at) {
@@ -135,6 +171,11 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
              primary_location_id=@primaryLocationId,
              quantity=@quantity,
              note=@note,
+             expiry_date=@expiryDate,
+             opened_at=@openedAt,
+             valid_days_after_open=@validDaysAfterOpen,
+             remind_days=@remindDays,
+             low_stock_threshold=@lowStockThreshold,
              updated_at=datetime('now')
          WHERE id=@id`
       )
@@ -146,7 +187,14 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
         location: locationPath,
         primaryLocationId: nextPrimary ?? null,
         quantity: nextQty,
-        note: patch.note !== undefined ? patch.note : existing.note
+        note: patch.note !== undefined ? patch.note : existing.note,
+        expiryDate: patch.expiryDate !== undefined ? patch.expiryDate : existing.expiry_date,
+        openedAt: patch.openedAt !== undefined ? patch.openedAt : existing.opened_at,
+        validDaysAfterOpen:
+          patch.validDaysAfterOpen !== undefined ? patch.validDaysAfterOpen : existing.valid_days_after_open,
+        remindDays: patch.remindDays !== undefined ? patch.remindDays : existing.remind_days,
+        lowStockThreshold:
+          patch.lowStockThreshold !== undefined ? patch.lowStockThreshold : existing.low_stock_threshold
       });
 
     syncPrimaryStock(app, params.id, nextPrimary ?? null, nextQty);

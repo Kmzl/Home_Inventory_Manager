@@ -39,7 +39,18 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"active" | "trash">("active");
   const [showForm, setShowForm] = useState(true);
-  const [form, setForm] = useState({ name: "", category: "", location: "", quantity: 1, note: "" });
+  const [form, setForm] = useState({
+    name: "",
+    category: "",
+    location: "",
+    quantity: 1,
+    note: "",
+    expiryDate: "",
+    openedAt: "",
+    validDaysAfterOpen: "",
+    remindDays: "7",
+    lowStockThreshold: ""
+  });
 
   const loadData = async () => {
     try {
@@ -84,11 +95,27 @@ export default function HomePage() {
           category: form.category || null,
           location: form.location || null,
           quantity: Number(form.quantity) || 1,
-          note: form.note || null
+          note: form.note || null,
+          expiryDate: form.expiryDate || null,
+          openedAt: form.openedAt || null,
+          validDaysAfterOpen: form.validDaysAfterOpen ? Number(form.validDaysAfterOpen) : null,
+          remindDays: form.remindDays ? Number(form.remindDays) : 7,
+          lowStockThreshold: form.lowStockThreshold ? Number(form.lowStockThreshold) : null
         })
       });
       if (!res.ok) throw new Error("新增失败");
-      setForm({ name: "", category: "", location: "", quantity: 1, note: "" });
+      setForm({
+        name: "",
+        category: "",
+        location: "",
+        quantity: 1,
+        note: "",
+        expiryDate: "",
+        openedAt: "",
+        validDaysAfterOpen: "",
+        remindDays: "7",
+        lowStockThreshold: ""
+      });
       setShowForm(false);
       await loadData();
     } catch (e) {
@@ -181,6 +208,11 @@ export default function HomePage() {
             <input placeholder="位置（如：客厅柜）" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
             <input type="number" min={1} placeholder="数量" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} />
             <input placeholder="备注" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            <input type="date" placeholder="到期日" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} />
+            <input type="date" placeholder="开封日" value={form.openedAt} onChange={(e) => setForm({ ...form, openedAt: e.target.value })} />
+            <input placeholder="开封后有效天数" type="number" min={1} value={form.validDaysAfterOpen} onChange={(e) => setForm({ ...form, validDaysAfterOpen: e.target.value })} />
+            <input placeholder="提前提醒天数" type="number" min={1} value={form.remindDays} onChange={(e) => setForm({ ...form, remindDays: e.target.value })} />
+            <input placeholder="低库存阈值" type="number" min={0} value={form.lowStockThreshold} onChange={(e) => setForm({ ...form, lowStockThreshold: e.target.value })} />
             <button className="full" type="submit">创建物品</button>
           </form>
         ) : null}
