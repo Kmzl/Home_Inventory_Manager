@@ -5,6 +5,7 @@ type Candidate = {
   name: string;
   category: string | null;
   primary_location: string | null;
+  primary_location_id: number | null;
   total_qty: number;
   locations: string[];
   confidence: number;
@@ -46,7 +47,7 @@ async function rerankWithOllama(query: string, candidates: Candidate[]) {
   const prompt = `你是家庭物品管理助手。根据用户提问，对候选物品按相关性打分并给简短原因。\n` +
     `返回严格 JSON 数组，元素字段: id(number), confidence(0-1), reason(string)。不要输出任何额外文本。\n` +
     `用户提问: ${query}\n` +
-    `候选:\n${JSON.stringify(candidates.map((c) => ({ id: c.id, name: c.name, category: c.category, primary_location: c.primary_location, locations: c.locations })))}`;
+    `候选:\n${JSON.stringify(candidates.map((c) => ({ id: c.id, name: c.name, category: c.category, primary_location: c.primary_location, primary_location_id: c.primary_location_id, locations: c.locations })))}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 1800);
@@ -72,14 +73,21 @@ export async function aiSearchRoutes(app: FastifyInstance): Promise<void> {
 
     const base = app.db
       .prepare(
-        `SELECT i.id, i.name, c.name AS category, l.path AS primary_location,
+        `SELECT i.id, i.name, c.name AS category, l.path AS primary_location, i.primary_location_id,
                 COALESCE((SELECT SUM(il.quantity) FROM item_locations il WHERE il.item_id=i.id), i.quantity) AS total_qty
          FROM items i
          LEFT JOIN categories c ON c.id=i.category_id
          LEFT JOIN locations l ON l.id=i.primary_location_id
          WHERE i.deleted_at IS NULL`
       )
-      .all() as Array<{ id: number; name: string; category: string | null; primary_location: string | null; total_qty: number }>;
+      .all() as Array<{
+        id: number;
+        name: string;
+        category: string | null;
+        primary_location: string | null;
+        primary_location_id: number | null;
+        total_qty: number;
+      }>;
 
     const candidates: Candidate[] = base.map((b) => {
       const locRows = app.db
@@ -122,6 +130,7 @@ export async function aiSearchRoutes(app: FastifyInstance): Promise<void> {
         name: r.name,
         category: r.category,
         primaryLocation: r.primary_location,
+        primaryLocationId: r.primary_location_id,
         otherLocations: r.locations.filter((l) => l !== r.primary_location),
         quantity: r.total_qty,
         confidence: Number(r.confidence.toFixed(2)),

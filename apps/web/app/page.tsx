@@ -87,7 +87,7 @@ export default function HomePage() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [pushPreview, setPushPreview] = useState<Array<{ todo_id: number; risk_type: string; item_name: string; location: string | null; detail: string }>>([]);
   const [aiQuery, setAiQuery] = useState("");
-  const [aiResults, setAiResults] = useState<Array<{ id: number; name: string; primaryLocation: string | null; otherLocations: string[]; confidence: number; reason: string }>>([]);
+  const [aiResults, setAiResults] = useState<Array<{ id: number; name: string; primaryLocation: string | null; primaryLocationId: number | null; otherLocations: string[]; confidence: number; reason: string }>>([]);
   const [aiModel, setAiModel] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -525,6 +525,11 @@ export default function HomePage() {
                   </div>
                   <div className="item-meta">原因：{r.reason}</div>
                 </div>
+                {r.primaryLocationId ? (
+                  <a href={`/nfc/${r.primaryLocationId}`} target="_blank" rel="noreferrer">
+                    <button className="secondary">直达位置</button>
+                  </a>
+                ) : null}
               </li>
             ))}
           </ul>
