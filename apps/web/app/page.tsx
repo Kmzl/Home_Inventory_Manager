@@ -86,6 +86,9 @@ export default function HomePage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [pushPreview, setPushPreview] = useState<Array<{ todo_id: number; risk_type: string; item_name: string; location: string | null; detail: string }>>([]);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiResults, setAiResults] = useState<Array<{ id: number; name: string; primaryLocation: string | null; otherLocations: string[]; confidence: number; reason: string }>>([]);
+  const [aiModel, setAiModel] = useState("");
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -273,6 +276,15 @@ export default function HomePage() {
     const json = await res.json();
     await loadData();
     alert(`今日写入发送记录 ${json.sentCount} 条`);
+  };
+
+  const runAiSearch = async () => {
+    if (!aiQuery.trim()) return;
+    const res = await fetch(`${API_BASE}/api/ai/search?q=${encodeURIComponent(aiQuery)}`);
+    if (!res.ok) return setError("AI 搜索失败");
+    const json = await res.json();
+    setAiModel(json.modelUsed || "");
+    setAiResults(json.candidates || []);
   };
 
   const loadItemDistribution = async (itemId: number) => {
@@ -483,6 +495,41 @@ export default function HomePage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>AI 辅助搜索（Ollama）</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            placeholder="例如：螺丝刀在哪？"
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void runAiSearch();
+            }}
+          />
+          <button onClick={() => void runAiSearch()}>搜索</button>
+        </div>
+        {aiModel ? <p className="item-meta" style={{ marginTop: 8 }}>模型：{aiModel}</p> : null}
+        {aiResults.length > 0 ? (
+          <ul className="list" style={{ marginTop: 8 }}>
+            {aiResults.map((r) => (
+              <li className="item-row" key={r.id}>
+                <div>
+                  <strong>{r.name}</strong>
+                  <div className="item-meta">
+                    主位置：{r.primaryLocation || "未设置"}
+                    {r.otherLocations?.length ? ` ｜ 其他位置：${r.otherLocations.join("、")}` : ""}
+                    {` ｜ 置信度：${Math.round(r.confidence * 100)}%`}
+                  </div>
+                  <div className="item-meta">原因：{r.reason}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty" style={{ marginTop: 8 }}>输入问题后开始搜索。</p>
         )}
       </section>
 

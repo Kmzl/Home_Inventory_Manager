@@ -9,6 +9,7 @@ import { importRoutes } from "./routes/import.js";
 import { categoryRoutes } from "./routes/categories.js";
 import { nfcRoutes } from "./routes/nfc.js";
 import { pushRoutes } from "./routes/push.js";
+import { aiSearchRoutes } from "./routes/ai-search.js";
 
 export type BuildServerOptions = {
   databaseUrl: string;
@@ -42,6 +43,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(categoryRoutes);
   await app.register(nfcRoutes);
   await app.register(pushRoutes);
+  await app.register(aiSearchRoutes);
 
   return app;
 }
