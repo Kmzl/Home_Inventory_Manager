@@ -180,6 +180,13 @@ export default function HomePage() {
     await loadData();
   };
 
+  const permanentDelete = async (id: number) => {
+    if (!window.confirm("确认永久删除？该操作不可恢复。")) return;
+    const res = await fetch(`${API_BASE}/api/items/${id}/permanent`, { method: "DELETE" });
+    if (!res.ok) return setError("永久删除失败");
+    await loadData();
+  };
+
   const markTodoHandled = async (id: number) => {
     const res = await fetch(`${API_BASE}/api/todos/${id}/handled`, { method: "POST" });
     if (!res.ok) return setError("标记失败");
@@ -525,7 +532,10 @@ export default function HomePage() {
                   <strong>{item.name}</strong>
                   <div className="item-meta">已删除，可恢复</div>
                 </div>
-                <button className="secondary" onClick={() => void restore(item.id)}>恢复</button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="secondary" onClick={() => void restore(item.id)}>恢复</button>
+                  <button className="danger" onClick={() => void permanentDelete(item.id)}>永久删除</button>
+                </div>
               </li>
             ))}
           </ul>

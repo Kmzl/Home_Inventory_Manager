@@ -350,4 +350,14 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
     }
     return { ok: true };
   });
+
+  app.delete("/api/items/:id/permanent", async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+    const res = app.db.prepare(`DELETE FROM items WHERE id=? AND deleted_at IS NOT NULL`).run(params.id);
+    if (res.changes === 0) {
+      reply.code(404);
+      return { error: "Item not found or not in trash" };
+    }
+    return { ok: true };
+  });
 }
