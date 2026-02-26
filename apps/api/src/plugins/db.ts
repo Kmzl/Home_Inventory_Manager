@@ -76,9 +76,31 @@ function initSchema(db: DbInstance): void {
       FOREIGN KEY(location_id) REFERENCES locations(id)
     );
 
+    CREATE TABLE IF NOT EXISTS risk_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL,
+      risk_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      detail TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at TEXT,
+      UNIQUE(item_id, risk_type),
+      FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS todo_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      risk_event_id INTEGER NOT NULL UNIQUE,
+      handled_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(risk_event_id) REFERENCES risk_events(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_items_deleted_at ON items(deleted_at);
     CREATE INDEX IF NOT EXISTS idx_item_locations_item_id ON item_locations(item_id);
     CREATE INDEX IF NOT EXISTS idx_locations_parent_id ON locations(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_risk_events_status ON risk_events(status);
   `);
 
   // Compatible migration for older DBs

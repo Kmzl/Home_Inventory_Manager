@@ -4,6 +4,7 @@ import { createDb, type DbInstance } from "./plugins/db.js";
 import { healthRoutes } from "./routes/health.js";
 import { itemRoutes } from "./routes/items.js";
 import { locationRoutes } from "./routes/locations.js";
+import { riskRoutes } from "./routes/risks.js";
 
 export type BuildServerOptions = {
   databaseUrl: string;
@@ -32,6 +33,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(healthRoutes);
   await app.register(locationRoutes);
   await app.register(itemRoutes);
+  await app.register(riskRoutes);
 
   return app;
 }
