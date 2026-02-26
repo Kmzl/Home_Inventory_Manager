@@ -12,11 +12,30 @@ type Item = {
   deleted_at: string | null;
 };
 
+type Risk = {
+  id: number;
+  risk_type: string;
+  detail: string;
+  item_name: string;
+  location: string | null;
+};
+
+type Todo = {
+  id: number;
+  risk_type: string;
+  detail: string;
+  item_name: string;
+  location: string | null;
+  handled_at: string | null;
+};
+
 const API_BASE = "http://localhost:3001";
 
 export default function HomePage() {
   const [items, setItems] = useState<Item[]>([]);
   const [trash, setTrash] = useState<Item[]>([]);
+  const [risks, setRisks] = useState<Risk[]>([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"active" | "trash">("active");
   const [showForm, setShowForm] = useState(true);
@@ -25,15 +44,24 @@ export default function HomePage() {
   const loadData = async () => {
     try {
       setError("");
-      const [activeRes, trashRes] = await Promise.all([
+      const [activeRes, trashRes, risksRes, todosRes] = await Promise.all([
         fetch(`${API_BASE}/api/items`),
-        fetch(`${API_BASE}/api/items/trash`)
+        fetch(`${API_BASE}/api/items/trash`),
+        fetch(`${API_BASE}/api/risks`),
+        fetch(`${API_BASE}/api/todos`)
       ]);
-      if (!activeRes.ok || !trashRes.ok) throw new Error("加载数据失败，请确认 API 已启动");
+      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok) {
+        throw new Error("加载数据失败，请确认 API 已启动");
+      }
+
       const activeJson = await activeRes.json();
       const trashJson = await trashRes.json();
+      const risksJson = await risksRes.json();
+      const todosJson = await todosRes.json();
       setItems(activeJson.items ?? []);
       setTrash(trashJson.items ?? []);
+      setRisks(risksJson.risks ?? []);
+      setTodos(todosJson.todos ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "未知错误");
     }
@@ -81,6 +109,12 @@ export default function HomePage() {
     await loadData();
   };
 
+  const markTodoHandled = async (id: number) => {
+    const res = await fetch(`${API_BASE}/api/todos/${id}/handled`, { method: "POST" });
+    if (!res.ok) return setError("标记失败");
+    await loadData();
+  };
+
   return (
     <main className="page">
       <header className="header card">
@@ -89,6 +123,49 @@ export default function HomePage() {
       </header>
 
       {error ? <p className="error">错误：{error}</p> : null}
+
+      <section className="card">
+        <h2>待处理中心（{todos.length}）</h2>
+        {todos.length === 0 ? (
+          <p className="empty">暂无待处理风险。</p>
+        ) : (
+          <ul className="list">
+            {todos.map((todo) => (
+              <li className="item-row" key={todo.id}>
+                <div>
+                  <strong>{todo.item_name}</strong>
+                  <div className="item-meta">
+                    {todo.risk_type} ｜ {todo.detail}
+                    {todo.location ? ` ｜ ${todo.location}` : ""}
+                  </div>
+                </div>
+                <button className="secondary" onClick={() => void markTodoHandled(todo.id)}>标记已处理</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>风险快照（{risks.length}）</h2>
+        {risks.length === 0 ? (
+          <p className="empty">当前没有激活风险。</p>
+        ) : (
+          <ul className="list">
+            {risks.map((risk) => (
+              <li className="item-row" key={risk.id}>
+                <div>
+                  <strong>{risk.item_name}</strong>
+                  <div className="item-meta">
+                    {risk.risk_type} ｜ {risk.detail}
+                    {risk.location ? ` ｜ ${risk.location}` : ""}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="card">
         <div className="section-head">
