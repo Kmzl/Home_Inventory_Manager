@@ -59,13 +59,26 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
           i.created_at,
           i.updated_at,
           c.name AS category,
+          COALESCE(c.sort_order, 999999) AS category_sort_order,
           l.path AS location,
-          COALESCE((SELECT SUM(il.quantity) FROM item_locations il WHERE il.item_id=i.id), i.quantity) AS quantity
+          COALESCE((SELECT SUM(il.quantity) FROM item_locations il WHERE il.item_id=i.id), i.quantity) AS quantity,
+          COALESCE((
+            SELECT MAX(
+              CASE re.risk_type
+                WHEN 'expired' THEN 3
+                WHEN 'expiring_soon' THEN 2
+                WHEN 'low_stock' THEN 1
+                ELSE 0
+              END
+            )
+            FROM risk_events re
+            WHERE re.item_id = i.id AND re.status = 'active'
+          ), 0) AS risk_priority
         FROM items i
         LEFT JOIN categories c ON c.id = i.category_id
         LEFT JOIN locations l ON l.id = i.primary_location_id
         WHERE i.deleted_at IS NULL
-        ORDER BY i.id DESC`
+        ORDER BY category_sort_order ASC, COALESCE(c.name, '未分类') ASC, risk_priority DESC, i.id DESC`
       )
       .all();
     return { items: rows };

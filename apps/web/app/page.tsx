@@ -10,6 +10,8 @@ type Item = {
   quantity: number;
   note: string | null;
   deleted_at: string | null;
+  category_sort_order?: number;
+  risk_priority?: number;
 };
 
 type Risk = {
@@ -335,6 +337,13 @@ export default function HomePage() {
     await loadData();
   };
 
+  const groupedItems = items.reduce<Record<string, Item[]>>((acc, item) => {
+    const key = item.category || "未分类";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
   return (
     <main className="page">
       <header className="header card">
@@ -538,69 +547,92 @@ export default function HomePage() {
           items.length === 0 ? (
             <p className="empty">暂无在用物品，先新增一条吧。</p>
           ) : (
-            <ul className="list">
-              {items.map((item) => (
-                <li className="item-row" key={item.id}>
-                  <div style={{ width: "100%" }}>
-                    <strong>{item.name}</strong> × {item.quantity}
-                    <div className="item-meta">{[item.category, item.location, item.note].filter(Boolean).join(" ｜ ") || "无附加信息"}</div>
-
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      <button
-                        className="secondary"
-                        onClick={() => {
-                          const next = expandedItemId === item.id ? null : item.id;
-                          setExpandedItemId(next);
-                          if (next) {
-                            void loadItemDistribution(item.id);
-                            setDistForm({ itemId: item.id, locationId: "", quantity: "1" });
-                          }
-                        }}
-                      >
-                        {expandedItemId === item.id ? "收起分布" : "展开分布"}
-                      </button>
-                      <button className="danger" onClick={() => void softDelete(item.id)}>移入回收站</button>
-                    </div>
-
-                    {expandedItemId === item.id ? (
-                      <div style={{ marginTop: 10, borderTop: "1px dashed #ddd", paddingTop: 10 }}>
-                        <div className="item-meta" style={{ marginBottom: 8 }}>多位置库存分布</div>
-                        <ul className="list">
-                          {(itemLocations[item.id] ?? []).map((d) => (
-                            <li className="item-row" key={`${item.id}-${d.location_id}`}>
-                              <div>{d.path || `位置#${d.location_id}`} × {d.quantity}</div>
-                              <button className="danger" onClick={() => void removeDistribution(item.id, d.location_id)}>删除</button>
-                            </li>
-                          ))}
-                        </ul>
-                        <form className="form-grid" onSubmit={addDistribution} style={{ marginTop: 8 }}>
-                          <select
-                            value={distForm?.itemId === item.id ? distForm.locationId : ""}
-                            onChange={(e) =>
-                              setDistForm({ itemId: item.id, locationId: e.target.value, quantity: distForm?.quantity ?? "1" })
-                            }
-                          >
-                            <option value="">选择位置</option>
-                            {locations.map((l) => (
-                              <option key={l.id} value={String(l.id)}>{l.path || l.name}</option>
-                            ))}
-                          </select>
-                          <input
-                            type="number"
-                            min={0}
-                            value={distForm?.itemId === item.id ? distForm.quantity : "1"}
-                            onChange={(e) =>
-                              setDistForm({ itemId: item.id, locationId: distForm?.locationId ?? "", quantity: e.target.value })
-                            }
-                          />
-                          <button className="full" type="submit">添加/更新分布</button>
-                        </form>
-                      </div>
-                    ) : null}
+            <div style={{ display: "grid", gap: 12 }}>
+              {Object.entries(groupedItems).map(([category, group]) => (
+                <div key={category}>
+                  <div className="item-meta" style={{ marginBottom: 6 }}>
+                    <strong>{category}</strong>
                   </div>
-                </li>
+                  <ul className="list">
+                    {group.map((item) => (
+                      <li className="item-row" key={item.id}>
+                        <div style={{ width: "100%" }}>
+                          <strong>{item.name}</strong> × {item.quantity}
+                          <div className="item-meta">
+                            {[
+                              item.risk_priority === 3
+                                ? "已过期"
+                                : item.risk_priority === 2
+                                ? "即将过期"
+                                : item.risk_priority === 1
+                                ? "库存紧张"
+                                : "普通",
+                              item.location,
+                              item.note
+                            ]
+                              .filter(Boolean)
+                              .join(" ｜ ") || "无附加信息"}
+                          </div>
+
+                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                            <button
+                              className="secondary"
+                              onClick={() => {
+                                const next = expandedItemId === item.id ? null : item.id;
+                                setExpandedItemId(next);
+                                if (next) {
+                                  void loadItemDistribution(item.id);
+                                  setDistForm({ itemId: item.id, locationId: "", quantity: "1" });
+                                }
+                              }}
+                            >
+                              {expandedItemId === item.id ? "收起分布" : "展开分布"}
+                            </button>
+                            <button className="danger" onClick={() => void softDelete(item.id)}>移入回收站</button>
+                          </div>
+
+                          {expandedItemId === item.id ? (
+                            <div style={{ marginTop: 10, borderTop: "1px dashed #ddd", paddingTop: 10 }}>
+                              <div className="item-meta" style={{ marginBottom: 8 }}>多位置库存分布</div>
+                              <ul className="list">
+                                {(itemLocations[item.id] ?? []).map((d) => (
+                                  <li className="item-row" key={`${item.id}-${d.location_id}`}>
+                                    <div>{d.path || `位置#${d.location_id}`} × {d.quantity}</div>
+                                    <button className="danger" onClick={() => void removeDistribution(item.id, d.location_id)}>删除</button>
+                                  </li>
+                                ))}
+                              </ul>
+                              <form className="form-grid" onSubmit={addDistribution} style={{ marginTop: 8 }}>
+                                <select
+                                  value={distForm?.itemId === item.id ? distForm.locationId : ""}
+                                  onChange={(e) =>
+                                    setDistForm({ itemId: item.id, locationId: e.target.value, quantity: distForm?.quantity ?? "1" })
+                                  }
+                                >
+                                  <option value="">选择位置</option>
+                                  {locations.map((l) => (
+                                    <option key={l.id} value={String(l.id)}>{l.path || l.name}</option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={distForm?.itemId === item.id ? distForm.quantity : "1"}
+                                  onChange={(e) =>
+                                    setDistForm({ itemId: item.id, locationId: distForm?.locationId ?? "", quantity: e.target.value })
+                                  }
+                                />
+                                <button className="full" type="submit">添加/更新分布</button>
+                              </form>
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           )
         ) : trash.length === 0 ? (
           <p className="empty">回收站为空。</p>
