@@ -296,6 +296,37 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  app.get("/api/items/stale", async () => {
+    const rows = app.db
+      .prepare(
+        `SELECT
+          i.id,
+          i.name,
+          i.location,
+          i.last_confirmed_at,
+          i.created_at,
+          CAST((julianday('now') - julianday(COALESCE(i.last_confirmed_at, i.created_at))) AS INTEGER) AS stale_days
+         FROM items i
+         WHERE i.deleted_at IS NULL
+           AND (julianday('now') - julianday(COALESCE(i.last_confirmed_at, i.created_at))) >= 180
+         ORDER BY stale_days DESC`
+      )
+      .all();
+    return { items: rows };
+  });
+
+  app.post("/api/items/:id/confirm", async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+    const res = app.db
+      .prepare(`UPDATE items SET last_confirmed_at=datetime('now'), updated_at=datetime('now') WHERE id=? AND deleted_at IS NULL`)
+      .run(params.id);
+    if (res.changes === 0) {
+      reply.code(404);
+      return { error: "Item not found" };
+    }
+    return { ok: true };
+  });
+
   app.post("/api/items/:id/delete", async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
     const res = app.db

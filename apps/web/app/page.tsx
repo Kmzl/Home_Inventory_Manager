@@ -47,6 +47,14 @@ type ImportRow = {
   error: string | null;
 };
 
+type StaleItem = {
+  id: number;
+  name: string;
+  location: string | null;
+  stale_days: number;
+  last_confirmed_at: string | null;
+};
+
 const API_BASE = "http://localhost:3001";
 
 export default function HomePage() {
@@ -65,6 +73,7 @@ export default function HomePage() {
   const [importText, setImportText] = useState("");
   const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
   const [importStats, setImportStats] = useState<{ successCount: number; errorCount: number } | null>(null);
+  const [staleItems, setStaleItems] = useState<StaleItem[]>([]);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -82,14 +91,15 @@ export default function HomePage() {
   const loadData = async () => {
     try {
       setError("");
-      const [activeRes, trashRes, risksRes, todosRes, locationsRes] = await Promise.all([
+      const [activeRes, trashRes, risksRes, todosRes, locationsRes, staleRes] = await Promise.all([
         fetch(`${API_BASE}/api/items`),
         fetch(`${API_BASE}/api/items/trash`),
         fetch(`${API_BASE}/api/risks`),
         fetch(`${API_BASE}/api/todos`),
-        fetch(`${API_BASE}/api/locations`)
+        fetch(`${API_BASE}/api/locations`),
+        fetch(`${API_BASE}/api/items/stale`)
       ]);
-      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok) {
+      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok || !staleRes.ok) {
         throw new Error("加载数据失败，请确认 API 已启动");
       }
 
@@ -98,11 +108,13 @@ export default function HomePage() {
       const risksJson = await risksRes.json();
       const todosJson = await todosRes.json();
       const locationsJson = await locationsRes.json();
+      const staleJson = await staleRes.json();
       setItems(activeJson.items ?? []);
       setTrash(trashJson.items ?? []);
       setRisks(risksJson.risks ?? []);
       setTodos(todosJson.todos ?? []);
       setLocations(locationsJson.locations ?? []);
+      setStaleItems(staleJson.items ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "未知错误");
     }
@@ -171,6 +183,12 @@ export default function HomePage() {
   const markTodoHandled = async (id: number) => {
     const res = await fetch(`${API_BASE}/api/todos/${id}/handled`, { method: "POST" });
     if (!res.ok) return setError("标记失败");
+    await loadData();
+  };
+
+  const confirmStaleItem = async (id: number) => {
+    const res = await fetch(`${API_BASE}/api/items/${id}/confirm`, { method: "POST" });
+    if (!res.ok) return setError("确认失败");
     await loadData();
   };
 
@@ -366,6 +384,28 @@ export default function HomePage() {
                     {risk.location ? ` ｜ ${risk.location}` : ""}
                   </div>
                 </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>久未使用（{staleItems.length}）</h2>
+        {staleItems.length === 0 ? (
+          <p className="empty">暂无超过 180 天未确认的物品。</p>
+        ) : (
+          <ul className="list">
+            {staleItems.map((item) => (
+              <li className="item-row" key={item.id}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <div className="item-meta">
+                    {item.location ? `${item.location} ｜ ` : ""}
+                    {item.stale_days} 天未确认
+                  </div>
+                </div>
+                <button className="secondary" onClick={() => void confirmStaleItem(item.id)}>确认在用</button>
               </li>
             ))}
           </ul>
