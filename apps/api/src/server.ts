@@ -11,6 +11,7 @@ import { nfcRoutes } from "./routes/nfc.js";
 import { pushRoutes } from "./routes/push.js";
 import { aiSearchRoutes } from "./routes/ai-search.js";
 import { pushConfigRoutes } from "./routes/push-config.js";
+import { pushStatusRoutes } from "./routes/push-status.js";
 import { startPushScheduler } from "./plugins/push-scheduler.js";
 
 export type BuildServerOptions = {
@@ -47,6 +48,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(pushRoutes);
   await app.register(aiSearchRoutes);
   await app.register(pushConfigRoutes);
+  await app.register(pushStatusRoutes);
 
   const pushSchedulerTimer = startPushScheduler(app);
   app.addHook("onClose", async () => {

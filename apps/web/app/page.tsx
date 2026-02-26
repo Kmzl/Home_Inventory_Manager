@@ -89,6 +89,15 @@ export default function HomePage() {
   const [aiQuery, setAiQuery] = useState("");
   const [aiResults, setAiResults] = useState<Array<{ id: number; name: string; primaryLocation: string | null; primaryLocationId: number | null; otherLocations: string[]; confidence: number; reason: string }>>([]);
   const [aiModel, setAiModel] = useState("");
+  const [pushStatus, setPushStatus] = useState<{
+    configured: boolean;
+    enabled: boolean;
+    provider: string | null;
+    pendingToday: number;
+    scheduler: { dailyHour: number; dailyMinute: number };
+    lastRun: { dateKey: string; at: string } | null;
+    lastDelivery: { status: string; item_name: string | null; risk_type: string | null; created_at: string } | null;
+  } | null>(null);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -106,16 +115,17 @@ export default function HomePage() {
   const loadData = async () => {
     try {
       setError("");
-      const [activeRes, trashRes, risksRes, todosRes, locationsRes, staleRes, categoriesRes] = await Promise.all([
+      const [activeRes, trashRes, risksRes, todosRes, locationsRes, staleRes, categoriesRes, pushStatusRes] = await Promise.all([
         fetch(`${API_BASE}/api/items`),
         fetch(`${API_BASE}/api/items/trash`),
         fetch(`${API_BASE}/api/risks`),
         fetch(`${API_BASE}/api/todos`),
         fetch(`${API_BASE}/api/locations`),
         fetch(`${API_BASE}/api/items/stale`),
-        fetch(`${API_BASE}/api/categories`)
+        fetch(`${API_BASE}/api/categories`),
+        fetch(`${API_BASE}/api/push/status`)
       ]);
-      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok || !staleRes.ok || !categoriesRes.ok) {
+      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok || !staleRes.ok || !categoriesRes.ok || !pushStatusRes.ok) {
         throw new Error("加载数据失败，请确认 API 已启动");
       }
 
@@ -126,6 +136,7 @@ export default function HomePage() {
       const locationsJson = await locationsRes.json();
       const staleJson = await staleRes.json();
       const categoriesJson = await categoriesRes.json();
+      const pushStatusJson = await pushStatusRes.json();
       setItems(activeJson.items ?? []);
       setTrash(trashJson.items ?? []);
       setRisks(risksJson.risks ?? []);
@@ -133,6 +144,7 @@ export default function HomePage() {
       setLocations(locationsJson.locations ?? []);
       setStaleItems(staleJson.items ?? []);
       setCategories(categoriesJson.categories ?? []);
+      setPushStatus(pushStatusJson ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "未知错误");
     }
@@ -386,6 +398,36 @@ export default function HomePage() {
       </header>
 
       {error ? <p className="error">错误：{error}</p> : null}
+
+      <section className="card">
+        <h2>推送状态</h2>
+        {pushStatus ? (
+          <>
+            <p className="item-meta">
+              配置：{pushStatus.configured ? "已配置" : "未配置"} ｜ 启用：{String(pushStatus.enabled)} ｜ 通道：{pushStatus.provider || "-"}
+            </p>
+            <p className="item-meta">
+              每日执行时间：{String(pushStatus.scheduler.dailyHour).padStart(2, "0")}:{String(pushStatus.scheduler.dailyMinute).padStart(2, "0")} ｜ 今日待推送：{pushStatus.pendingToday}
+            </p>
+            <p className="item-meta">
+              最近运行：{pushStatus.lastRun ? `${pushStatus.lastRun.dateKey} (${pushStatus.lastRun.at})` : "暂无"}
+            </p>
+            <p className="item-meta">
+              最近投递：
+              {pushStatus.lastDelivery
+                ? `${pushStatus.lastDelivery.status} / ${pushStatus.lastDelivery.item_name || "-"} / ${pushStatus.lastDelivery.risk_type || "-"}`
+                : "暂无"}
+            </p>
+            <div style={{ marginTop: 8 }}>
+              <a href="/push-config" target="_blank" rel="noreferrer">
+                <button className="secondary">打开推送配置与日志</button>
+              </a>
+            </div>
+          </>
+        ) : (
+          <p className="empty">状态加载中...</p>
+        )}
+      </section>
 
       <section className="card">
         <h2>位置管理（{locations.length}）</h2>
