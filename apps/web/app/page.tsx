@@ -49,6 +49,9 @@ export default function HomePage() {
   const [tab, setTab] = useState<"active" | "trash">("active");
   const [showForm, setShowForm] = useState(true);
   const [locationForm, setLocationForm] = useState({ name: "", level: 1, parentId: "" });
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
+  const [itemLocations, setItemLocations] = useState<Record<number, Array<{ location_id: number; quantity: number; path: string | null }>>>({});
+  const [distForm, setDistForm] = useState<{ itemId: number; locationId: string; quantity: string } | null>(null);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -156,6 +159,37 @@ export default function HomePage() {
     const res = await fetch(`${API_BASE}/api/todos/${id}/handled`, { method: "POST" });
     if (!res.ok) return setError("标记失败");
     await loadData();
+  };
+
+  const loadItemDistribution = async (itemId: number) => {
+    const res = await fetch(`${API_BASE}/api/items/${itemId}/locations`);
+    if (!res.ok) return setError("加载分布失败");
+    const json = await res.json();
+    setItemLocations((prev) => ({ ...prev, [itemId]: json.locations ?? [] }));
+  };
+
+  const addDistribution = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!distForm) return;
+    const res = await fetch(`${API_BASE}/api/items/${distForm.itemId}/locations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        locationId: Number(distForm.locationId),
+        quantity: Number(distForm.quantity || 0)
+      })
+    });
+    if (!res.ok) return setError("添加分布失败");
+    await loadData();
+    await loadItemDistribution(distForm.itemId);
+    setDistForm({ itemId: distForm.itemId, locationId: "", quantity: "1" });
+  };
+
+  const removeDistribution = async (itemId: number, locationId: number) => {
+    const res = await fetch(`${API_BASE}/api/items/${itemId}/locations/${locationId}`, { method: "DELETE" });
+    if (!res.ok) return setError("删除分布失败");
+    await loadData();
+    await loadItemDistribution(itemId);
   };
 
   const createLocation = async (e: FormEvent) => {
@@ -301,11 +335,63 @@ export default function HomePage() {
             <ul className="list">
               {items.map((item) => (
                 <li className="item-row" key={item.id}>
-                  <div>
+                  <div style={{ width: "100%" }}>
                     <strong>{item.name}</strong> × {item.quantity}
                     <div className="item-meta">{[item.category, item.location, item.note].filter(Boolean).join(" ｜ ") || "无附加信息"}</div>
+
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          const next = expandedItemId === item.id ? null : item.id;
+                          setExpandedItemId(next);
+                          if (next) {
+                            void loadItemDistribution(item.id);
+                            setDistForm({ itemId: item.id, locationId: "", quantity: "1" });
+                          }
+                        }}
+                      >
+                        {expandedItemId === item.id ? "收起分布" : "展开分布"}
+                      </button>
+                      <button className="danger" onClick={() => void softDelete(item.id)}>移入回收站</button>
+                    </div>
+
+                    {expandedItemId === item.id ? (
+                      <div style={{ marginTop: 10, borderTop: "1px dashed #ddd", paddingTop: 10 }}>
+                        <div className="item-meta" style={{ marginBottom: 8 }}>多位置库存分布</div>
+                        <ul className="list">
+                          {(itemLocations[item.id] ?? []).map((d) => (
+                            <li className="item-row" key={`${item.id}-${d.location_id}`}>
+                              <div>{d.path || `位置#${d.location_id}`} × {d.quantity}</div>
+                              <button className="danger" onClick={() => void removeDistribution(item.id, d.location_id)}>删除</button>
+                            </li>
+                          ))}
+                        </ul>
+                        <form className="form-grid" onSubmit={addDistribution} style={{ marginTop: 8 }}>
+                          <select
+                            value={distForm?.itemId === item.id ? distForm.locationId : ""}
+                            onChange={(e) =>
+                              setDistForm({ itemId: item.id, locationId: e.target.value, quantity: distForm?.quantity ?? "1" })
+                            }
+                          >
+                            <option value="">选择位置</option>
+                            {locations.map((l) => (
+                              <option key={l.id} value={String(l.id)}>{l.path || l.name}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min={0}
+                            value={distForm?.itemId === item.id ? distForm.quantity : "1"}
+                            onChange={(e) =>
+                              setDistForm({ itemId: item.id, locationId: distForm?.locationId ?? "", quantity: e.target.value })
+                            }
+                          />
+                          <button className="full" type="submit">添加/更新分布</button>
+                        </form>
+                      </div>
+                    ) : null}
                   </div>
-                  <button className="danger" onClick={() => void softDelete(item.id)}>移入回收站</button>
                 </li>
               ))}
             </ul>

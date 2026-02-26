@@ -202,6 +202,100 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
     return { item };
   });
 
+  app.get("/api/items/:id/locations", async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+    const exists = app.db.prepare(`SELECT id FROM items WHERE id = ?`).get(params.id) as { id: number } | undefined;
+    if (!exists) {
+      reply.code(404);
+      return { error: "Item not found" };
+    }
+
+    const locations = app.db
+      .prepare(
+        `SELECT il.location_id, il.quantity, l.path, l.level
+         FROM item_locations il
+         JOIN locations l ON l.id = il.location_id
+         WHERE il.item_id = ?
+         ORDER BY l.level ASC, l.path ASC`
+      )
+      .all(params.id);
+    return { locations };
+  });
+
+  app.post("/api/items/:id/locations", async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+    const body = z.object({ locationId: z.number().int().positive(), quantity: z.number().int().min(0) }).parse(request.body);
+
+    const item = app.db.prepare(`SELECT id, primary_location_id FROM items WHERE id = ?`).get(params.id) as
+      | { id: number; primary_location_id: number | null }
+      | undefined;
+    if (!item) {
+      reply.code(404);
+      return { error: "Item not found" };
+    }
+
+    const loc = app.db.prepare(`SELECT id, path FROM locations WHERE id = ?`).get(body.locationId) as
+      | { id: number; path: string }
+      | undefined;
+    if (!loc) {
+      reply.code(400);
+      return { error: "Location not found" };
+    }
+
+    app.db
+      .prepare(
+        `INSERT INTO item_locations (item_id, location_id, quantity, updated_at)
+         VALUES (?, ?, ?, datetime('now'))
+         ON CONFLICT(item_id, location_id)
+         DO UPDATE SET quantity=excluded.quantity, updated_at=datetime('now')`
+      )
+      .run(params.id, body.locationId, body.quantity);
+
+    if (!item.primary_location_id) {
+      app.db
+        .prepare(`UPDATE items SET primary_location_id=?, location=?, updated_at=datetime('now') WHERE id=?`)
+        .run(body.locationId, loc.path, params.id);
+    }
+
+    const total = app.db
+      .prepare(`SELECT COALESCE(SUM(quantity),0) AS total FROM item_locations WHERE item_id = ?`)
+      .get(params.id) as { total: number };
+    app.db.prepare(`UPDATE items SET quantity=?, updated_at=datetime('now') WHERE id=?`).run(total.total, params.id);
+
+    return { ok: true };
+  });
+
+  app.delete("/api/items/:id/locations/:locationId", async (request, reply) => {
+    const params = z
+      .object({ id: z.coerce.number().int().positive(), locationId: z.coerce.number().int().positive() })
+      .parse(request.params);
+
+    const res = app.db.prepare(`DELETE FROM item_locations WHERE item_id=? AND location_id=?`).run(params.id, params.locationId);
+    if (res.changes === 0) {
+      reply.code(404);
+      return { error: "Distribution not found" };
+    }
+
+    const total = app.db
+      .prepare(`SELECT COALESCE(SUM(quantity),0) AS total FROM item_locations WHERE item_id = ?`)
+      .get(params.id) as { total: number };
+    app.db.prepare(`UPDATE items SET quantity=?, updated_at=datetime('now') WHERE id=?`).run(total.total, params.id);
+
+    const item = app.db.prepare(`SELECT primary_location_id FROM items WHERE id=?`).get(params.id) as
+      | { primary_location_id: number | null }
+      | undefined;
+    if (item?.primary_location_id === params.locationId) {
+      const fallback = app.db
+        .prepare(`SELECT il.location_id, l.path FROM item_locations il JOIN locations l ON l.id=il.location_id WHERE il.item_id=? LIMIT 1`)
+        .get(params.id) as { location_id: number; path: string } | undefined;
+      app.db
+        .prepare(`UPDATE items SET primary_location_id=?, location=?, updated_at=datetime('now') WHERE id=?`)
+        .run(fallback?.location_id ?? null, fallback?.path ?? null, params.id);
+    }
+
+    return { ok: true };
+  });
+
   app.post("/api/items/:id/delete", async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
     const res = app.db
