@@ -55,6 +55,13 @@ type StaleItem = {
   last_confirmed_at: string | null;
 };
 
+type CategoryItem = {
+  id: number;
+  name: string;
+  sort_order: number;
+  item_count: number;
+};
+
 const API_BASE = "http://localhost:3001";
 
 export default function HomePage() {
@@ -74,6 +81,8 @@ export default function HomePage() {
   const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
   const [importStats, setImportStats] = useState<{ successCount: number; errorCount: number } | null>(null);
   const [staleItems, setStaleItems] = useState<StaleItem[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -91,15 +100,16 @@ export default function HomePage() {
   const loadData = async () => {
     try {
       setError("");
-      const [activeRes, trashRes, risksRes, todosRes, locationsRes, staleRes] = await Promise.all([
+      const [activeRes, trashRes, risksRes, todosRes, locationsRes, staleRes, categoriesRes] = await Promise.all([
         fetch(`${API_BASE}/api/items`),
         fetch(`${API_BASE}/api/items/trash`),
         fetch(`${API_BASE}/api/risks`),
         fetch(`${API_BASE}/api/todos`),
         fetch(`${API_BASE}/api/locations`),
-        fetch(`${API_BASE}/api/items/stale`)
+        fetch(`${API_BASE}/api/items/stale`),
+        fetch(`${API_BASE}/api/categories`)
       ]);
-      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok || !staleRes.ok) {
+      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok || !staleRes.ok || !categoriesRes.ok) {
         throw new Error("加载数据失败，请确认 API 已启动");
       }
 
@@ -109,12 +119,14 @@ export default function HomePage() {
       const todosJson = await todosRes.json();
       const locationsJson = await locationsRes.json();
       const staleJson = await staleRes.json();
+      const categoriesJson = await categoriesRes.json();
       setItems(activeJson.items ?? []);
       setTrash(trashJson.items ?? []);
       setRisks(risksJson.risks ?? []);
       setTodos(todosJson.todos ?? []);
       setLocations(locationsJson.locations ?? []);
       setStaleItems(staleJson.items ?? []);
+      setCategories(categoriesJson.categories ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "未知错误");
     }
@@ -196,6 +208,51 @@ export default function HomePage() {
   const confirmStaleItem = async (id: number) => {
     const res = await fetch(`${API_BASE}/api/items/${id}/confirm`, { method: "POST" });
     if (!res.ok) return setError("确认失败");
+    await loadData();
+  };
+
+  const createCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    const res = await fetch(`${API_BASE}/api/categories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newCategoryName })
+    });
+    if (!res.ok) return setError("创建分类失败");
+    setNewCategoryName("");
+    await loadData();
+  };
+
+  const renameCategory = async (id: number, oldName: string) => {
+    const name = window.prompt("输入新分类名", oldName);
+    if (!name || name.trim() === oldName) return;
+    const res = await fetch(`${API_BASE}/api/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() })
+    });
+    if (!res.ok) return setError("重命名失败");
+    await loadData();
+  };
+
+  const updateCategorySort = async (id: number, current: number) => {
+    const v = window.prompt("输入排序值（整数，越小越前）", String(current));
+    if (!v) return;
+    const sortOrder = Number(v);
+    if (!Number.isInteger(sortOrder)) return setError("排序值必须是整数");
+    const res = await fetch(`${API_BASE}/api/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sortOrder })
+    });
+    if (!res.ok) return setError("更新排序失败");
+    await loadData();
+  };
+
+  const deleteCategory = async (id: number) => {
+    if (!window.confirm("确认删除该分类？若有物品引用将失败。")) return;
+    const res = await fetch(`${API_BASE}/api/categories/${id}`, { method: "DELETE" });
+    if (!res.ok) return setError("删除失败：分类下可能仍有物品");
     await loadData();
   };
 
@@ -311,6 +368,29 @@ export default function HomePage() {
             <li className="item-row" key={l.id}>
               <div>
                 <strong>L{l.level}</strong> · {l.path || l.name}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="card">
+        <h2>分类管理（{categories.length}）</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input placeholder="新分类名" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
+          <button onClick={() => void createCategory()}>新增分类</button>
+        </div>
+        <ul className="list" style={{ marginTop: 10 }}>
+          {categories.map((c) => (
+            <li className="item-row" key={c.id}>
+              <div>
+                <strong>{c.name}</strong>
+                <div className="item-meta">排序: {c.sort_order} ｜ 物品数: {c.item_count}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="secondary" onClick={() => void renameCategory(c.id, c.name)}>重命名</button>
+                <button className="secondary" onClick={() => void updateCategorySort(c.id, c.sort_order)}>排序</button>
+                <button className="danger" onClick={() => void deleteCategory(c.id)}>删除</button>
               </div>
             </li>
           ))}

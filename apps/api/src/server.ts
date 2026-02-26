@@ -6,6 +6,7 @@ import { itemRoutes } from "./routes/items.js";
 import { locationRoutes } from "./routes/locations.js";
 import { riskRoutes } from "./routes/risks.js";
 import { importRoutes } from "./routes/import.js";
+import { categoryRoutes } from "./routes/categories.js";
 
 export type BuildServerOptions = {
   databaseUrl: string;
@@ -36,6 +37,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(itemRoutes);
   await app.register(riskRoutes);
   await app.register(importRoutes);
+  await app.register(categoryRoutes);
 
   return app;
 }
