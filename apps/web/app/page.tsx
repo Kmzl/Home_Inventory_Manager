@@ -330,6 +330,17 @@ export default function HomePage() {
     await loadItemDistribution(itemId);
   };
 
+  const setPrimaryLocation = async (itemId: number, locationId: number) => {
+    const res = await fetch(`${API_BASE}/api/items/${itemId}/primary-location`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locationId })
+    });
+    if (!res.ok) return setError("设置主位置失败");
+    await loadData();
+    await loadItemDistribution(itemId);
+  };
+
   const previewImport = async () => {
     if (!importText.trim()) return;
     const res = await fetch(`${API_BASE}/api/import/preview`, {
@@ -738,12 +749,25 @@ export default function HomePage() {
                             <div style={{ marginTop: 10, borderTop: "1px dashed #ddd", paddingTop: 10 }}>
                               <div className="item-meta" style={{ marginBottom: 8 }}>多位置库存分布</div>
                               <ul className="list">
-                                {(itemLocations[item.id] ?? []).map((d) => (
-                                  <li className="item-row" key={`${item.id}-${d.location_id}`}>
-                                    <div>{d.path || `位置#${d.location_id}`} × {d.quantity}</div>
-                                    <button className="danger" onClick={() => void removeDistribution(item.id, d.location_id)}>删除</button>
-                                  </li>
-                                ))}
+                                {(itemLocations[item.id] ?? []).map((d) => {
+                                  const isPrimary = (d.path || "") === (item.location || "");
+                                  return (
+                                    <li className="item-row" key={`${item.id}-${d.location_id}`}>
+                                      <div>
+                                        {d.path || `位置#${d.location_id}`} × {d.quantity}
+                                        {isPrimary ? <span className="item-meta"> ｜ 主位置</span> : null}
+                                      </div>
+                                      <div style={{ display: "flex", gap: 8 }}>
+                                        {!isPrimary ? (
+                                          <button className="secondary" onClick={() => void setPrimaryLocation(item.id, d.location_id)}>
+                                            设为主位置
+                                          </button>
+                                        ) : null}
+                                        <button className="danger" onClick={() => void removeDistribution(item.id, d.location_id)}>删除</button>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
                               </ul>
                               <form className="form-grid" onSubmit={addDistribution} style={{ marginTop: 8 }}>
                                 <select

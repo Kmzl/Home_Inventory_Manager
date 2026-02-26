@@ -278,6 +278,26 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  app.post("/api/items/:id/primary-location", async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+    const body = z.object({ locationId: z.number().int().positive() }).parse(request.body);
+
+    const distribution = app.db
+      .prepare(`SELECT il.location_id, l.path FROM item_locations il JOIN locations l ON l.id=il.location_id WHERE il.item_id=? AND il.location_id=?`)
+      .get(params.id, body.locationId) as { location_id: number; path: string } | undefined;
+
+    if (!distribution) {
+      reply.code(400);
+      return { error: "Location is not in item's distribution" };
+    }
+
+    app.db
+      .prepare(`UPDATE items SET primary_location_id=?, location=?, updated_at=datetime('now') WHERE id=?`)
+      .run(body.locationId, distribution.path, params.id);
+
+    return { ok: true };
+  });
+
   app.delete("/api/items/:id/locations/:locationId", async (request, reply) => {
     const params = z
       .object({ id: z.coerce.number().int().positive(), locationId: z.coerce.number().int().positive() })
