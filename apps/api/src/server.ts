@@ -10,6 +10,7 @@ import { categoryRoutes } from "./routes/categories.js";
 import { nfcRoutes } from "./routes/nfc.js";
 import { pushRoutes } from "./routes/push.js";
 import { aiSearchRoutes } from "./routes/ai-search.js";
+import { pushConfigRoutes } from "./routes/push-config.js";
 
 export type BuildServerOptions = {
   databaseUrl: string;
@@ -44,6 +45,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(nfcRoutes);
   await app.register(pushRoutes);
   await app.register(aiSearchRoutes);
+  await app.register(pushConfigRoutes);
 
   return app;
 }

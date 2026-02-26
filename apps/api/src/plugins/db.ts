@@ -110,6 +110,12 @@ function initSchema(db: DbInstance): void {
       FOREIGN KEY(todo_event_id) REFERENCES todo_events(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_risk_events_status ON risk_events(status);
     CREATE INDEX IF NOT EXISTS idx_push_records_date ON push_records(date_key, channel);
   `);

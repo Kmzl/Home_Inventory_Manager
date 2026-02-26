@@ -27,20 +27,41 @@ function queryDailyPushCandidates(app: FastifyInstance, dateKey: string) {
     .all(dateKey);
 }
 
+function hasWechatConfig(app: FastifyInstance): boolean {
+  const row = app.db.prepare(`SELECT value FROM app_settings WHERE key = 'push.wechat.config'`).get() as
+    | { value: string }
+    | undefined;
+  if (!row) return false;
+  try {
+    const cfg = JSON.parse(row.value) as { enabled?: boolean };
+    return cfg.enabled !== false;
+  } catch {
+    return false;
+  }
+}
+
 export async function pushRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/push/daily-preview", async () => {
     const dateKey = getDateKey();
-    const items = queryDailyPushCandidates(app, dateKey);
+    const configured = hasWechatConfig(app);
+    const items = configured ? queryDailyPushCandidates(app, dateKey) : [];
     return {
       dateKey,
       channel: "wechat",
+      configured,
       count: items.length,
       items,
-      note: "仅预览，不会写入发送记录"
+      note: configured ? "仅预览，不会写入发送记录" : "尚未配置微信推送"
     };
   });
 
-  app.post("/api/push/daily-send", async () => {
+  app.post("/api/push/daily-send", async (request, reply) => {
+    const configured = hasWechatConfig(app);
+    if (!configured) {
+      reply.code(400);
+      return { error: "微信推送尚未配置" };
+    }
+
     const dateKey = getDateKey();
     const items = queryDailyPushCandidates(app, dateKey) as Array<{ todo_id: number }>;
 

@@ -378,6 +378,11 @@ export default function HomePage() {
       <header className="header card">
         <h1>🏠 Home Inventory MVP</h1>
         <p>家庭物品管理（本地版）— 支持新增、查看、软删除和回收站恢复</p>
+        <div style={{ marginTop: 10 }}>
+          <a href="/push-config" target="_blank" rel="noreferrer">
+            <button className="secondary">打开微信推送配置页</button>
+          </a>
+        </div>
       </header>
 
       {error ? <p className="error">错误：{error}</p> : null}
