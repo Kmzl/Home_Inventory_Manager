@@ -18,6 +18,8 @@ export default function HomePage() {
   const [items, setItems] = useState<Item[]>([]);
   const [trash, setTrash] = useState<Item[]>([]);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<"active" | "trash">("active");
+  const [showForm, setShowForm] = useState(true);
   const [form, setForm] = useState({ name: "", category: "", location: "", quantity: 1, note: "" });
 
   const loadData = async () => {
@@ -59,6 +61,7 @@ export default function HomePage() {
       });
       if (!res.ok) throw new Error("新增失败");
       setForm({ name: "", category: "", location: "", quantity: 1, note: "" });
+      setShowForm(false);
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : "未知错误");
@@ -88,41 +91,47 @@ export default function HomePage() {
       {error ? <p className="error">错误：{error}</p> : null}
 
       <section className="card">
-        <h2>新增物品</h2>
-        <form className="form-grid" onSubmit={createItem}>
-          <input placeholder="名称*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input placeholder="分类（如：电器）" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-          <input placeholder="位置（如：客厅柜）" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-          <input type="number" min={1} placeholder="数量" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} />
-          <input placeholder="备注" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-          <button className="full" type="submit">创建物品</button>
-        </form>
+        <div className="section-head">
+          <h2>新增物品</h2>
+          <button className="secondary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "收起" : "展开"}
+          </button>
+        </div>
+        {showForm ? (
+          <form className="form-grid" onSubmit={createItem}>
+            <input placeholder="名称*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input placeholder="分类（如：电器）" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+            <input placeholder="位置（如：客厅柜）" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+            <input type="number" min={1} placeholder="数量" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} />
+            <input placeholder="备注" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            <button className="full" type="submit">创建物品</button>
+          </form>
+        ) : null}
       </section>
 
       <section className="card">
-        <h2>在用物品（{items.length}）</h2>
-        {items.length === 0 ? (
-          <p className="empty">暂无在用物品，先新增一条吧。</p>
-        ) : (
-          <ul className="list">
-            {items.map((item) => (
-              <li className="item-row" key={item.id}>
-                <div>
-                  <strong>{item.name}</strong> × {item.quantity}
-                  <div className="item-meta">
-                    {[item.category, item.location, item.note].filter(Boolean).join(" ｜ ") || "无附加信息"}
+        <div className="segmented" role="tablist" aria-label="列表切换">
+          <button className={tab === "active" ? "seg active" : "seg"} onClick={() => setTab("active")}>在用物品（{items.length}）</button>
+          <button className={tab === "trash" ? "seg active" : "seg"} onClick={() => setTab("trash")}>回收站（{trash.length}）</button>
+        </div>
+
+        {tab === "active" ? (
+          items.length === 0 ? (
+            <p className="empty">暂无在用物品，先新增一条吧。</p>
+          ) : (
+            <ul className="list">
+              {items.map((item) => (
+                <li className="item-row" key={item.id}>
+                  <div>
+                    <strong>{item.name}</strong> × {item.quantity}
+                    <div className="item-meta">{[item.category, item.location, item.note].filter(Boolean).join(" ｜ ") || "无附加信息"}</div>
                   </div>
-                </div>
-                <button className="danger" onClick={() => void softDelete(item.id)}>移入回收站</button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>回收站（{trash.length}）</h2>
-        {trash.length === 0 ? (
+                  <button className="danger" onClick={() => void softDelete(item.id)}>移入回收站</button>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : trash.length === 0 ? (
           <p className="empty">回收站为空。</p>
         ) : (
           <ul className="list">
@@ -138,6 +147,8 @@ export default function HomePage() {
           </ul>
         )}
       </section>
+
+      <button className="fab" onClick={() => setShowForm(true)} aria-label="新增物品">＋</button>
     </main>
   );
 }
