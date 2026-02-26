@@ -36,6 +36,7 @@ export default function PushConfigPage() {
   const [token, setToken] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [error, setError] = useState("");
+  const [testMsg, setTestMsg] = useState("");
 
   const load = async () => {
     const res = await fetch(`${API_BASE}/api/push/config`);
@@ -50,6 +51,7 @@ export default function PushConfigPage() {
 
   const save = async () => {
     setError("");
+    setTestMsg("");
     const res = await fetch(`${API_BASE}/api/push/config`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,6 +60,26 @@ export default function PushConfigPage() {
     if (!res.ok) return setError("保存失败，请检查 endpoint/token");
     setToken("");
     await load();
+  };
+
+  const testSend = async () => {
+    setError("");
+    setTestMsg("");
+    const payload = status?.configured
+      ? { useStored: true }
+      : {
+          provider,
+          endpoint,
+          token
+        };
+    const res = await fetch(`${API_BASE}/api/push/config/test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (!res.ok) return setError(json.error || json.message || "测试发送失败");
+    setTestMsg(json.message || "测试发送成功");
   };
 
   return (
@@ -95,6 +117,9 @@ export default function PushConfigPage() {
           <p className="item-meta">endpoint: {status.config?.endpoint}</p>
           <p className="item-meta">token: {status.config?.tokenMasked}</p>
           <p className="item-meta">enabled: {String(status.config?.enabled)}</p>
+          <div style={{ marginTop: 8 }}>
+            <button className="secondary" onClick={() => void testSend()}>发送测试消息</button>
+          </div>
         </section>
       )}
 
@@ -116,7 +141,9 @@ export default function PushConfigPage() {
             <option value="0">停用</option>
           </select>
           <button className="full" onClick={() => void save()}>保存</button>
+          <button className="full secondary" onClick={() => void testSend()}>发送测试消息</button>
         </div>
+        {testMsg ? <p className="item-meta" style={{ marginTop: 10 }}>{testMsg}</p> : null}
       </section>
     </main>
   );

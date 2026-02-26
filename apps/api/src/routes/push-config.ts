@@ -20,6 +20,41 @@ function getConfig(app: FastifyInstance): PushConfig | null {
   }
 }
 
+async function sendTestMessage(cfg: PushConfig) {
+  const title = "Home Inventory 推送测试";
+  const body = `测试时间：${new Date().toLocaleString("zh-CN")}`;
+
+  if (cfg.provider === "serverchan") {
+    const endpoint = cfg.endpoint.includes("{token}") ? cfg.endpoint.replaceAll("{token}", encodeURIComponent(cfg.token)) : cfg.endpoint;
+    const payload = new URLSearchParams({ title, desp: body }).toString();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: payload,
+      signal: controller.signal
+    }).finally(() => clearTimeout(timer));
+    return { ok: res.ok, status: res.status, provider: cfg.provider };
+  }
+
+  const endpoint = cfg.endpoint;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      pushkey: cfg.token,
+      text: title,
+      desp: body,
+      type: "markdown"
+    }),
+    signal: controller.signal
+  }).finally(() => clearTimeout(timer));
+  return { ok: res.ok, status: res.status, provider: cfg.provider };
+}
+
 export async function pushConfigRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/push/config", async () => {
     const cfg = getConfig(app);
@@ -61,5 +96,45 @@ export async function pushConfigRoutes(app: FastifyInstance): Promise<void> {
       .run(KEY, JSON.stringify(cfg));
 
     return { ok: true };
+  });
+
+  app.post("/api/push/config/test", async (request, reply) => {
+    const body = z
+      .object({
+        provider: z.enum(["serverchan", "pushdeer"]).optional(),
+        endpoint: z.string().url().optional(),
+        token: z.string().min(1).optional(),
+        useStored: z.boolean().optional()
+      })
+      .parse(request.body ?? {});
+
+    const cfg = body.useStored ? getConfig(app) : null;
+    const finalCfg: PushConfig | null = cfg
+      ? cfg
+      : body.provider && body.endpoint && body.token
+      ? {
+          provider: body.provider,
+          endpoint: body.endpoint,
+          token: body.token,
+          enabled: true
+        }
+      : null;
+
+    if (!finalCfg) {
+      reply.code(400);
+      return { error: "请先保存配置，或传入 provider/endpoint/token" };
+    }
+
+    try {
+      const result = await sendTestMessage(finalCfg);
+      if (!result.ok) {
+        reply.code(400);
+        return { message: "测试发送失败", ...result };
+      }
+      return { message: "测试发送成功", ...result };
+    } catch (e) {
+      reply.code(500);
+      return { ok: false, error: e instanceof Error ? e.message : "unknown error" };
+    }
   });
 }
