@@ -116,8 +116,22 @@ function initSchema(db: DbInstance): void {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS push_delivery_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date_key TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'wechat',
+      todo_event_id INTEGER,
+      item_name TEXT,
+      risk_type TEXT,
+      status TEXT NOT NULL,
+      detail TEXT,
+      attempts INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_risk_events_status ON risk_events(status);
     CREATE INDEX IF NOT EXISTS idx_push_records_date ON push_records(date_key, channel);
+    CREATE INDEX IF NOT EXISTS idx_push_logs_date ON push_delivery_logs(date_key, channel);
   `);
 
   // Compatible migration for older DBs

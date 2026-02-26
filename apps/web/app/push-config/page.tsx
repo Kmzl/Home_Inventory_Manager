@@ -37,6 +37,7 @@ export default function PushConfigPage() {
   const [enabled, setEnabled] = useState(true);
   const [error, setError] = useState("");
   const [testMsg, setTestMsg] = useState("");
+  const [logs, setLogs] = useState<Array<{ id: number; date_key: string; item_name: string; risk_type: string; status: string; attempts: number; created_at: string }>>([]);
 
   const load = async () => {
     const res = await fetch(`${API_BASE}/api/push/config`);
@@ -45,8 +46,16 @@ export default function PushConfigPage() {
     setStatus(json);
   };
 
+  const loadLogs = async () => {
+    const res = await fetch(`${API_BASE}/api/push/logs`);
+    if (!res.ok) return;
+    const json = (await res.json()) as { logs?: Array<{ id: number; date_key: string; item_name: string; risk_type: string; status: string; attempts: number; created_at: string }> };
+    setLogs(json.logs ?? []);
+  };
+
   useEffect(() => {
     void load();
+    void loadLogs();
   }, []);
 
   const save = async () => {
@@ -60,6 +69,7 @@ export default function PushConfigPage() {
     if (!res.ok) return setError("保存失败，请检查 endpoint/token");
     setToken("");
     await load();
+    await loadLogs();
   };
 
   const testSend = async () => {
@@ -80,6 +90,7 @@ export default function PushConfigPage() {
     const json = await res.json();
     if (!res.ok) return setError(json.error || json.message || "测试发送失败");
     setTestMsg(json.message || "测试发送成功");
+    await loadLogs();
   };
 
   return (
@@ -144,6 +155,26 @@ export default function PushConfigPage() {
           <button className="full secondary" onClick={() => void testSend()}>发送测试消息</button>
         </div>
         {testMsg ? <p className="item-meta" style={{ marginTop: 10 }}>{testMsg}</p> : null}
+      </section>
+
+      <section className="card">
+        <h2>推送日志（最近 200 条）</h2>
+        {logs.length === 0 ? (
+          <p className="empty">暂无推送记录。</p>
+        ) : (
+          <ul className="list">
+            {logs.map((l) => (
+              <li className="item-row" key={l.id}>
+                <div>
+                  <strong>{l.item_name || "-"}</strong>
+                  <div className="item-meta">
+                    {l.date_key} ｜ {l.risk_type || "-"} ｜ {l.status} ｜ attempts={l.attempts}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );
