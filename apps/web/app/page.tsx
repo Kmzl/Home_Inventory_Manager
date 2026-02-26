@@ -37,6 +37,16 @@ type LocationItem = {
   path: string | null;
 };
 
+type ImportRow = {
+  lineNo: number;
+  raw: string;
+  name: string;
+  quantity: number;
+  category: string | null;
+  note: string | null;
+  error: string | null;
+};
+
 const API_BASE = "http://localhost:3001";
 
 export default function HomePage() {
@@ -52,6 +62,9 @@ export default function HomePage() {
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [itemLocations, setItemLocations] = useState<Record<number, Array<{ location_id: number; quantity: number; path: string | null }>>>({});
   const [distForm, setDistForm] = useState<{ itemId: number; locationId: string; quantity: string } | null>(null);
+  const [importText, setImportText] = useState("");
+  const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
+  const [importStats, setImportStats] = useState<{ successCount: number; errorCount: number } | null>(null);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -192,6 +205,35 @@ export default function HomePage() {
     await loadItemDistribution(itemId);
   };
 
+  const previewImport = async () => {
+    if (!importText.trim()) return;
+    const res = await fetch(`${API_BASE}/api/import/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: importText })
+    });
+    if (!res.ok) return setError("预览失败");
+    const json = await res.json();
+    setImportPreview(json.rows ?? []);
+    setImportStats({ successCount: json.successCount ?? 0, errorCount: json.errorCount ?? 0 });
+  };
+
+  const commitImport = async () => {
+    if (!importText.trim()) return;
+    const res = await fetch(`${API_BASE}/api/import/commit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: importText })
+    });
+    if (!res.ok) return setError("导入失败");
+    const json = await res.json();
+    setImportText("");
+    setImportPreview([]);
+    setImportStats(null);
+    await loadData();
+    alert(`导入完成：成功 ${json.success} 条，失败 ${json.failed} 条`);
+  };
+
   const createLocation = async (e: FormEvent) => {
     e.preventDefault();
     if (!locationForm.name.trim()) return;
@@ -248,6 +290,43 @@ export default function HomePage() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="card">
+        <h2>批量导入</h2>
+        <p className="item-meta">每行：名称,数量,分类,备注（支持中英文逗号，数量可缺省默认1）</p>
+        <textarea
+          value={importText}
+          onChange={(e) => setImportText(e.target.value)}
+          rows={6}
+          placeholder={`牙线,10,日用品,补货\n维生素C,2,保健,早餐后\n螺丝刀,,工具,十字`}
+          style={{ width: "100%", borderRadius: 10, border: "1px solid #e5e7eb", padding: 10, marginTop: 8 }}
+        />
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button className="secondary" onClick={() => void previewImport()}>预览</button>
+          <button onClick={() => void commitImport()}>执行导入</button>
+        </div>
+
+        {importStats ? (
+          <p className="item-meta" style={{ marginTop: 8 }}>
+            预览结果：可导入 {importStats.successCount} 条，错误 {importStats.errorCount} 条
+          </p>
+        ) : null}
+
+        {importPreview.length > 0 ? (
+          <ul className="list" style={{ marginTop: 8 }}>
+            {importPreview.map((r) => (
+              <li key={r.lineNo} className="item-row">
+                <div>
+                  <strong>第 {r.lineNo} 行</strong>：{r.raw}
+                  <div className="item-meta">
+                    {r.error ? `错误：${r.error}` : `解析：${r.name} × ${r.quantity}${r.category ? ` ｜ ${r.category}` : ""}`}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
 
       <section className="card">
