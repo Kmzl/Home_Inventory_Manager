@@ -61,7 +61,8 @@ main.page {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-input {
+input,
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 10px;

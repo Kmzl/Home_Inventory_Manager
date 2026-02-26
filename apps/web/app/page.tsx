@@ -29,6 +29,14 @@ type Todo = {
   handled_at: string | null;
 };
 
+type LocationItem = {
+  id: number;
+  parent_id: number | null;
+  level: number;
+  name: string;
+  path: string | null;
+};
+
 const API_BASE = "http://localhost:3001";
 
 export default function HomePage() {
@@ -36,9 +44,11 @@ export default function HomePage() {
   const [trash, setTrash] = useState<Item[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [locations, setLocations] = useState<LocationItem[]>([]);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"active" | "trash">("active");
   const [showForm, setShowForm] = useState(true);
+  const [locationForm, setLocationForm] = useState({ name: "", level: 1, parentId: "" });
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -49,19 +59,21 @@ export default function HomePage() {
     openedAt: "",
     validDaysAfterOpen: "",
     remindDays: "7",
-    lowStockThreshold: ""
+    lowStockThreshold: "",
+    primaryLocationId: ""
   });
 
   const loadData = async () => {
     try {
       setError("");
-      const [activeRes, trashRes, risksRes, todosRes] = await Promise.all([
+      const [activeRes, trashRes, risksRes, todosRes, locationsRes] = await Promise.all([
         fetch(`${API_BASE}/api/items`),
         fetch(`${API_BASE}/api/items/trash`),
         fetch(`${API_BASE}/api/risks`),
-        fetch(`${API_BASE}/api/todos`)
+        fetch(`${API_BASE}/api/todos`),
+        fetch(`${API_BASE}/api/locations`)
       ]);
-      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok) {
+      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok) {
         throw new Error("加载数据失败，请确认 API 已启动");
       }
 
@@ -69,10 +81,12 @@ export default function HomePage() {
       const trashJson = await trashRes.json();
       const risksJson = await risksRes.json();
       const todosJson = await todosRes.json();
+      const locationsJson = await locationsRes.json();
       setItems(activeJson.items ?? []);
       setTrash(trashJson.items ?? []);
       setRisks(risksJson.risks ?? []);
       setTodos(todosJson.todos ?? []);
+      setLocations(locationsJson.locations ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "未知错误");
     }
@@ -100,7 +114,8 @@ export default function HomePage() {
           openedAt: form.openedAt || null,
           validDaysAfterOpen: form.validDaysAfterOpen ? Number(form.validDaysAfterOpen) : null,
           remindDays: form.remindDays ? Number(form.remindDays) : 7,
-          lowStockThreshold: form.lowStockThreshold ? Number(form.lowStockThreshold) : null
+          lowStockThreshold: form.lowStockThreshold ? Number(form.lowStockThreshold) : null,
+          primaryLocationId: form.primaryLocationId ? Number(form.primaryLocationId) : null
         })
       });
       if (!res.ok) throw new Error("新增失败");
@@ -114,7 +129,8 @@ export default function HomePage() {
         openedAt: "",
         validDaysAfterOpen: "",
         remindDays: "7",
-        lowStockThreshold: ""
+        lowStockThreshold: "",
+        primaryLocationId: ""
       });
       setShowForm(false);
       await loadData();
@@ -142,6 +158,25 @@ export default function HomePage() {
     await loadData();
   };
 
+  const createLocation = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!locationForm.name.trim()) return;
+
+    const res = await fetch(`${API_BASE}/api/locations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: locationForm.name,
+        level: Number(locationForm.level),
+        parentId: locationForm.parentId ? Number(locationForm.parentId) : null
+      })
+    });
+
+    if (!res.ok) return setError("创建位置失败");
+    setLocationForm({ name: "", level: 1, parentId: "" });
+    await loadData();
+  };
+
   return (
     <main className="page">
       <header className="header card">
@@ -150,6 +185,36 @@ export default function HomePage() {
       </header>
 
       {error ? <p className="error">错误：{error}</p> : null}
+
+      <section className="card">
+        <h2>位置管理（{locations.length}）</h2>
+        <form className="form-grid" onSubmit={createLocation}>
+          <input placeholder="位置名称*" value={locationForm.name} onChange={(e) => setLocationForm({ ...locationForm, name: e.target.value })} />
+          <select value={locationForm.level} onChange={(e) => setLocationForm({ ...locationForm, level: Number(e.target.value) })}>
+            <option value={1}>一级（房间）</option>
+            <option value={2}>二级（柜子）</option>
+            <option value={3}>三级（抽屉/盒子）</option>
+          </select>
+          <select value={locationForm.parentId} onChange={(e) => setLocationForm({ ...locationForm, parentId: e.target.value })}>
+            <option value="">无父级</option>
+            {locations
+              .filter((l) => l.level < Number(locationForm.level))
+              .map((l) => (
+                <option key={l.id} value={String(l.id)}>{l.path || l.name}</option>
+              ))}
+          </select>
+          <button className="full" type="submit">新增位置</button>
+        </form>
+        <ul className="list" style={{ marginTop: 10 }}>
+          {locations.map((l) => (
+            <li className="item-row" key={l.id}>
+              <div>
+                <strong>L{l.level}</strong> · {l.path || l.name}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="card">
         <h2>待处理中心（{todos.length}）</h2>
@@ -205,7 +270,12 @@ export default function HomePage() {
           <form className="form-grid" onSubmit={createItem}>
             <input placeholder="名称*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input placeholder="分类（如：电器）" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-            <input placeholder="位置（如：客厅柜）" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+            <select value={form.primaryLocationId} onChange={(e) => setForm({ ...form, primaryLocationId: e.target.value })}>
+              <option value="">主位置（可选）</option>
+              {locations.map((l) => (
+                <option key={l.id} value={String(l.id)}>{l.path || l.name}</option>
+              ))}
+            </select>
             <input type="number" min={1} placeholder="数量" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} />
             <input placeholder="备注" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
             <input type="date" placeholder="到期日" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} />
