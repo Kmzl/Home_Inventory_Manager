@@ -1,0 +1,8 @@
+node_modules
+.pnpm-store
+.next
+dist
+.env
+apps/api/.env
+data/*.db
+data/*.db-*
