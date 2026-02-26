@@ -11,19 +11,32 @@ type Candidate = {
   reason: string;
 };
 
+function normalizeQuery(q: string): string {
+  const stopwords = ["在哪", "在哪里", "在", "吗", "呢", "呀", "有", "有没有", "我", "帮我", "请", "一下", "找", "找到", "看看"];
+  let s = q.toLowerCase().replace(/[？?！!。,.，]/g, " ").trim();
+  for (const w of stopwords) s = s.replaceAll(w, " ");
+  return s.replace(/\s+/g, " ").trim();
+}
+
 function scoreByKeyword(q: string, c: Candidate): { confidence: number; reason: string } {
   const text = `${c.name} ${c.category ?? ""} ${c.primary_location ?? ""} ${c.locations.join(" ")}`.toLowerCase();
-  const query = q.toLowerCase().trim();
+  const query = normalizeQuery(q);
 
   if (!query) return { confidence: 0, reason: "空查询" };
-  if (text.includes(query)) return { confidence: 0.9, reason: "完全匹配" };
+  if (text.includes(query)) return { confidence: 0.92, reason: "核心词完全匹配" };
 
   const tokens = query.split(/\s+/).filter(Boolean);
   const hit = tokens.filter((t) => text.includes(t)).length;
   const ratio = tokens.length ? hit / tokens.length : 0;
-  if (ratio > 0.6) return { confidence: 0.75, reason: "关键词高覆盖" };
-  if (ratio > 0.2) return { confidence: 0.55, reason: "关键词部分匹配" };
-  return { confidence: 0.25, reason: "弱匹配" };
+
+  // 中文短词兜底：按字符覆盖
+  const chars = [...query.replace(/\s+/g, "")].filter((x) => x.trim());
+  const charHit = chars.filter((ch) => text.includes(ch)).length;
+  const charRatio = chars.length ? charHit / chars.length : 0;
+
+  if (ratio > 0.6 || charRatio > 0.8) return { confidence: 0.78, reason: "关键词高覆盖" };
+  if (ratio > 0.2 || charRatio > 0.45) return { confidence: 0.58, reason: "关键词部分匹配" };
+  return { confidence: 0.22, reason: "弱匹配" };
 }
 
 async function rerankWithOllama(query: string, candidates: Candidate[]) {
