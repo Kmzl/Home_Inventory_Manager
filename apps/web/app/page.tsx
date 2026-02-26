@@ -475,6 +475,7 @@ export default function HomePage() {
 
       <section className="card">
         <h2>备份与恢复</h2>
+        <p className="item-meta">系统每天自动创建 1 份备份，并仅保留最近 14 天；你也可以手动立即备份。</p>
         <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <button className="secondary" onClick={() => void createBackup()}>立即创建备份</button>
         </div>

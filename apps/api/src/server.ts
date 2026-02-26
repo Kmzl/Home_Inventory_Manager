@@ -14,6 +14,7 @@ import { pushConfigRoutes } from "./routes/push-config.js";
 import { pushStatusRoutes } from "./routes/push-status.js";
 import { backupRoutes } from "./routes/backup.js";
 import { startPushScheduler } from "./plugins/push-scheduler.js";
+import { startBackupScheduler } from "./plugins/backup-scheduler.js";
 
 export type BuildServerOptions = {
   databaseUrl: string;
@@ -56,8 +57,10 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(backupRoutes);
 
   const pushSchedulerTimer = startPushScheduler(app);
+  const backupSchedulerTimer = startBackupScheduler(app);
   app.addHook("onClose", async () => {
     clearInterval(pushSchedulerTimer);
+    clearInterval(backupSchedulerTimer);
   });
 
   return app;
