@@ -85,6 +85,7 @@ export default function HomePage() {
   const [staleItems, setStaleItems] = useState<StaleItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [pushPreview, setPushPreview] = useState<Array<{ todo_id: number; risk_type: string; item_name: string; location: string | null; detail: string }>>([]);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -256,6 +257,22 @@ export default function HomePage() {
     const res = await fetch(`${API_BASE}/api/categories/${id}`, { method: "DELETE" });
     if (!res.ok) return setError("删除失败：分类下可能仍有物品");
     await loadData();
+  };
+
+  const previewDailyPush = async () => {
+    const res = await fetch(`${API_BASE}/api/push/daily-preview`);
+    if (!res.ok) return setError("加载推送预览失败");
+    const json = await res.json();
+    setPushPreview(json.items ?? []);
+  };
+
+  const simulateDailySend = async () => {
+    if (!window.confirm("执行今日推送模拟？会写入去重记录。")) return;
+    const res = await fetch(`${API_BASE}/api/push/daily-send`, { method: "POST" });
+    if (!res.ok) return setError("推送模拟失败");
+    const json = await res.json();
+    await loadData();
+    alert(`今日写入发送记录 ${json.sentCount} 条`);
   };
 
   const loadItemDistribution = async (itemId: number) => {
@@ -463,6 +480,29 @@ export default function HomePage() {
                   </div>
                 </div>
                 <button className="secondary" onClick={() => void markTodoHandled(todo.id)}>标记已处理</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>微信推送（日报模拟）</h2>
+        <p className="item-meta">规则：仅未处理且激活中的「已过期 / 库存紧张」，每日同事项只推一次。</p>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <button className="secondary" onClick={() => void previewDailyPush()}>预览今日推送</button>
+          <button onClick={() => void simulateDailySend()}>写入发送记录</button>
+        </div>
+        {pushPreview.length === 0 ? (
+          <p className="empty">暂无可推送事项（或尚未点击预览）。</p>
+        ) : (
+          <ul className="list">
+            {pushPreview.map((p) => (
+              <li className="item-row" key={p.todo_id}>
+                <div>
+                  <strong>{p.item_name}</strong>
+                  <div className="item-meta">{p.risk_type} ｜ {p.detail}{p.location ? ` ｜ ${p.location}` : ""}</div>
+                </div>
               </li>
             ))}
           </ul>

@@ -100,7 +100,18 @@ function initSchema(db: DbInstance): void {
     CREATE INDEX IF NOT EXISTS idx_items_deleted_at ON items(deleted_at);
     CREATE INDEX IF NOT EXISTS idx_item_locations_item_id ON item_locations(item_id);
     CREATE INDEX IF NOT EXISTS idx_locations_parent_id ON locations(parent_id);
+    CREATE TABLE IF NOT EXISTS push_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date_key TEXT NOT NULL,
+      todo_event_id INTEGER NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'wechat',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(date_key, todo_event_id, channel),
+      FOREIGN KEY(todo_event_id) REFERENCES todo_events(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_risk_events_status ON risk_events(status);
+    CREATE INDEX IF NOT EXISTS idx_push_records_date ON push_records(date_key, channel);
   `);
 
   // Compatible migration for older DBs

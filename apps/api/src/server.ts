@@ -8,6 +8,7 @@ import { riskRoutes } from "./routes/risks.js";
 import { importRoutes } from "./routes/import.js";
 import { categoryRoutes } from "./routes/categories.js";
 import { nfcRoutes } from "./routes/nfc.js";
+import { pushRoutes } from "./routes/push.js";
 
 export type BuildServerOptions = {
   databaseUrl: string;
@@ -40,6 +41,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(importRoutes);
   await app.register(categoryRoutes);
   await app.register(nfcRoutes);
+  await app.register(pushRoutes);
 
   return app;
 }
