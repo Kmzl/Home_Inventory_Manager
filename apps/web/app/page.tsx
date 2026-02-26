@@ -100,6 +100,7 @@ export default function HomePage() {
     lastRun: { dateKey: string; at: string } | null;
     lastDelivery: { status: string; item_name: string | null; risk_type: string | null; created_at: string } | null;
   } | null>(null);
+  const [backups, setBackups] = useState<Array<{ fileName: string; size: number; updatedAt: string }>>([]);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -117,7 +118,7 @@ export default function HomePage() {
   const loadData = async () => {
     try {
       setError("");
-      const [activeRes, trashRes, risksRes, todosRes, locationsRes, staleRes, categoriesRes, pushStatusRes] = await Promise.all([
+      const [activeRes, trashRes, risksRes, todosRes, locationsRes, staleRes, categoriesRes, pushStatusRes, backupRes] = await Promise.all([
         fetch(`${API_BASE}/api/items`),
         fetch(`${API_BASE}/api/items/trash`),
         fetch(`${API_BASE}/api/risks`),
@@ -125,9 +126,10 @@ export default function HomePage() {
         fetch(`${API_BASE}/api/locations`),
         fetch(`${API_BASE}/api/items/stale`),
         fetch(`${API_BASE}/api/categories`),
-        fetch(`${API_BASE}/api/push/status`)
+        fetch(`${API_BASE}/api/push/status`),
+        fetch(`${API_BASE}/api/backup/list`)
       ]);
-      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok || !staleRes.ok || !categoriesRes.ok || !pushStatusRes.ok) {
+      if (!activeRes.ok || !trashRes.ok || !risksRes.ok || !todosRes.ok || !locationsRes.ok || !staleRes.ok || !categoriesRes.ok || !pushStatusRes.ok || !backupRes.ok) {
         throw new Error("加载数据失败，请确认 API 已启动");
       }
 
@@ -139,6 +141,7 @@ export default function HomePage() {
       const staleJson = await staleRes.json();
       const categoriesJson = await categoriesRes.json();
       const pushStatusJson = await pushStatusRes.json();
+      const backupJson = await backupRes.json();
       setItems(activeJson.items ?? []);
       setTrash(trashJson.items ?? []);
       setRisks(risksJson.risks ?? []);
@@ -147,6 +150,7 @@ export default function HomePage() {
       setStaleItems(staleJson.items ?? []);
       setCategories(categoriesJson.categories ?? []);
       setPushStatus(pushStatusJson ?? null);
+      setBackups(backupJson.files ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "未知错误");
     }
@@ -380,6 +384,25 @@ export default function HomePage() {
     alert(`导入完成：成功 ${json.success} 条，跳过 ${json.skipped ?? 0} 条，失败 ${json.failed} 条`);
   };
 
+  const createBackup = async () => {
+    const res = await fetch(`${API_BASE}/api/backup/export`, { method: "POST" });
+    if (!res.ok) return setError("创建备份失败");
+    await loadData();
+  };
+
+  const restoreBackup = async (fileName: string) => {
+    const confirmed = window.prompt(`输入 RESTORE 确认恢复备份：${fileName}`);
+    if (confirmed !== "RESTORE") return;
+    const res = await fetch(`${API_BASE}/api/backup/restore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName, confirm: "RESTORE" })
+    });
+    if (!res.ok) return setError("恢复失败，请检查日志");
+    await loadData();
+    alert("恢复完成，建议刷新页面确认数据状态。");
+  };
+
   const createLocation = async (e: FormEvent) => {
     e.preventDefault();
     if (!locationForm.name.trim()) return;
@@ -447,6 +470,28 @@ export default function HomePage() {
           </>
         ) : (
           <p className="empty">状态加载中...</p>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>备份与恢复</h2>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <button className="secondary" onClick={() => void createBackup()}>立即创建备份</button>
+        </div>
+        {backups.length === 0 ? (
+          <p className="empty">暂无备份文件。</p>
+        ) : (
+          <ul className="list">
+            {backups.map((b) => (
+              <li className="item-row" key={b.fileName}>
+                <div>
+                  <strong>{b.fileName}</strong>
+                  <div className="item-meta">{(b.size / 1024).toFixed(1)} KB ｜ {b.updatedAt}</div>
+                </div>
+                <button className="danger" onClick={() => void restoreBackup(b.fileName)}>恢复此备份</button>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 

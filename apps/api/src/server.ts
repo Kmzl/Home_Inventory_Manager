@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
-import { createDb, type DbInstance } from "./plugins/db.js";
+import { createDb, resolveDatabasePath, type DbInstance } from "./plugins/db.js";
 import { healthRoutes } from "./routes/health.js";
 import { itemRoutes } from "./routes/items.js";
 import { locationRoutes } from "./routes/locations.js";
@@ -12,6 +12,7 @@ import { pushRoutes } from "./routes/push.js";
 import { aiSearchRoutes } from "./routes/ai-search.js";
 import { pushConfigRoutes } from "./routes/push-config.js";
 import { pushStatusRoutes } from "./routes/push-status.js";
+import { backupRoutes } from "./routes/backup.js";
 import { startPushScheduler } from "./plugins/push-scheduler.js";
 
 export type BuildServerOptions = {
@@ -21,6 +22,7 @@ export type BuildServerOptions = {
 declare module "fastify" {
   interface FastifyInstance {
     db: DbInstance;
+    dbPath: string;
   }
 }
 
@@ -31,8 +33,10 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
     origin: ["http://localhost:3000"]
   });
 
+  const dbPath = resolveDatabasePath(options.databaseUrl);
   const db = createDb(options.databaseUrl);
   app.decorate("db", db);
+  app.decorate("dbPath", dbPath);
 
   app.addHook("onClose", async () => {
     app.db.close();
@@ -49,6 +53,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(aiSearchRoutes);
   await app.register(pushConfigRoutes);
   await app.register(pushStatusRoutes);
+  await app.register(backupRoutes);
 
   const pushSchedulerTimer = startPushScheduler(app);
   app.addHook("onClose", async () => {
