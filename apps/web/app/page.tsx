@@ -17,7 +17,7 @@ const API_BASE = "http://localhost:3001";
 export default function HomePage() {
   const [items, setItems] = useState<Item[]>([]);
   const [trash, setTrash] = useState<Item[]>([]);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", category: "", location: "", quantity: 1, note: "" });
 
   const loadData = async () => {
@@ -27,7 +27,7 @@ export default function HomePage() {
         fetch(`${API_BASE}/api/items`),
         fetch(`${API_BASE}/api/items/trash`)
       ]);
-      if (!activeRes.ok || !trashRes.ok) throw new Error("加载数据失败");
+      if (!activeRes.ok || !trashRes.ok) throw new Error("加载数据失败，请确认 API 已启动");
       const activeJson = await activeRes.json();
       const trashJson = await trashRes.json();
       setItems(activeJson.items ?? []);
@@ -44,8 +44,8 @@ export default function HomePage() {
   const createItem = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return;
+
     try {
-      setError("");
       const res = await fetch(`${API_BASE}/api/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,70 +68,75 @@ export default function HomePage() {
   const softDelete = async (id: number) => {
     if (!window.confirm("确认将该物品移入回收站？")) return;
     const res = await fetch(`${API_BASE}/api/items/${id}/delete`, { method: "POST" });
-    if (!res.ok) {
-      setError("删除失败");
-      return;
-    }
+    if (!res.ok) return setError("删除失败");
     await loadData();
   };
 
   const restore = async (id: number) => {
     const res = await fetch(`${API_BASE}/api/items/${id}/restore`, { method: "POST" });
-    if (!res.ok) {
-      setError("恢复失败");
-      return;
-    }
+    if (!res.ok) return setError("恢复失败");
     await loadData();
   };
 
   return (
-    <main style={{ padding: 24, display: "grid", gap: 20, maxWidth: 960, margin: "0 auto" }}>
-      <h1>Home Inventory MVP</h1>
-      {error ? <p style={{ color: "crimson" }}>错误：{error}</p> : null}
+    <main className="page">
+      <header className="header card">
+        <h1>🏠 Home Inventory MVP</h1>
+        <p>家庭物品管理（本地版）— 支持新增、查看、软删除和回收站恢复</p>
+      </header>
 
-      <section>
+      {error ? <p className="error">错误：{error}</p> : null}
+
+      <section className="card">
         <h2>新增物品</h2>
-        <form onSubmit={createItem} style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(5,1fr)" }}>
+        <form className="form-grid" onSubmit={createItem}>
           <input placeholder="名称*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input placeholder="分类" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-          <input placeholder="位置" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-          <input
-            placeholder="数量"
-            type="number"
-            min={1}
-            value={form.quantity}
-            onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
-          />
+          <input placeholder="分类（如：电器）" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+          <input placeholder="位置（如：客厅柜）" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          <input type="number" min={1} placeholder="数量" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} />
           <input placeholder="备注" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-          <button style={{ gridColumn: "1 / -1" }} type="submit">创建</button>
+          <button className="full" type="submit">创建物品</button>
         </form>
       </section>
 
-      <section>
-        <h2>在用物品 ({items.length})</h2>
-        <ul>
-          {items.map((item) => (
-            <li key={item.id} style={{ marginBottom: 8 }}>
-              <b>{item.name}</b> x {item.quantity}
-              {item.category ? `｜${item.category}` : ""}
-              {item.location ? `｜${item.location}` : ""}
-              {item.note ? `｜${item.note}` : ""}
-              <button style={{ marginLeft: 10 }} onClick={() => void softDelete(item.id)}>移入回收站</button>
-            </li>
-          ))}
-        </ul>
+      <section className="card">
+        <h2>在用物品（{items.length}）</h2>
+        {items.length === 0 ? (
+          <p className="empty">暂无在用物品，先新增一条吧。</p>
+        ) : (
+          <ul className="list">
+            {items.map((item) => (
+              <li className="item-row" key={item.id}>
+                <div>
+                  <strong>{item.name}</strong> × {item.quantity}
+                  <div className="item-meta">
+                    {[item.category, item.location, item.note].filter(Boolean).join(" ｜ ") || "无附加信息"}
+                  </div>
+                </div>
+                <button className="danger" onClick={() => void softDelete(item.id)}>移入回收站</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
-      <section>
-        <h2>回收站 ({trash.length})</h2>
-        <ul>
-          {trash.map((item) => (
-            <li key={item.id}>
-              <b>{item.name}</b>
-              <button style={{ marginLeft: 10 }} onClick={() => void restore(item.id)}>恢复</button>
-            </li>
-          ))}
-        </ul>
+      <section className="card">
+        <h2>回收站（{trash.length}）</h2>
+        {trash.length === 0 ? (
+          <p className="empty">回收站为空。</p>
+        ) : (
+          <ul className="list">
+            {trash.map((item) => (
+              <li className="item-row" key={item.id}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <div className="item-meta">已删除，可恢复</div>
+                </div>
+                <button className="secondary" onClick={() => void restore(item.id)}>恢复</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );

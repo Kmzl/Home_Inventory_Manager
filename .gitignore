@@ -4,5 +4,6 @@ node_modules
 dist
 .env
 apps/api/.env
+*.tsbuildinfo
 data/*.db
 data/*.db-*
