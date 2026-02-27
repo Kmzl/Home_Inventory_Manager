@@ -106,6 +106,7 @@ export default function HomePage() {
     lastDelivery: { status: string; item_name: string | null; risk_type: string | null; created_at: string } | null;
   } | null>(null);
   const [backups, setBackups] = useState<Array<{ fileName: string; size: number; updatedAt: string }>>([]);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -601,9 +602,12 @@ export default function HomePage() {
           />
           {locationForm.imageUrl ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <a href={`${API_BASE}${locationForm.imageUrl}`} target="_blank" rel="noreferrer">
-                <img src={`${API_BASE}${locationForm.imageUrl}`} alt="位置预览" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8 }} />
-              </a>
+              <img
+                src={`${API_BASE}${locationForm.imageUrl}`}
+                alt="位置预览"
+                style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, cursor: "zoom-in" }}
+                onClick={() => setPreviewImageUrl(`${API_BASE}${locationForm.imageUrl}`)}
+              />
               <button className="danger" type="button" onClick={() => setLocationForm((p) => ({ ...p, imageUrl: "" }))}>移除图片</button>
             </div>
           ) : null}
@@ -613,7 +617,14 @@ export default function HomePage() {
           {locations.map((l) => (
             <li className="item-row" key={l.id}>
               <div>
-                {l.image_url ? <img src={`${API_BASE}${l.image_url}`} alt={l.name} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, marginRight: 8 }} /> : null}
+                {l.image_url ? (
+                  <img
+                    src={`${API_BASE}${l.image_url}`}
+                    alt={l.name}
+                    style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, marginRight: 8, cursor: "zoom-in" }}
+                    onClick={() => setPreviewImageUrl(`${API_BASE}${l.image_url}`)}
+                  />
+                ) : null}
                 <strong>L{l.level}</strong> · {l.path || l.name}
                 <div className="item-meta">NFC URL: /nfc/{l.id}</div>
               </div>
@@ -887,9 +898,12 @@ export default function HomePage() {
             />
             {form.imageUrl ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <a href={`${API_BASE}${form.imageUrl}`} target="_blank" rel="noreferrer">
-                  <img src={`${API_BASE}${form.imageUrl}`} alt="物品预览" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8 }} />
-                </a>
+                <img
+                  src={`${API_BASE}${form.imageUrl}`}
+                  alt="物品预览"
+                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, cursor: "zoom-in" }}
+                  onClick={() => setPreviewImageUrl(`${API_BASE}${form.imageUrl}`)}
+                />
                 <button className="danger" type="button" onClick={() => setForm((p) => ({ ...p, imageUrl: "" }))}>移除图片</button>
               </div>
             ) : null}
@@ -923,7 +937,8 @@ export default function HomePage() {
                               <img
                                 src={`${API_BASE}${item.image_url}`}
                                 alt={item.name}
-                                style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8 }}
+                                style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, cursor: "zoom-in" }}
+                                onClick={() => setPreviewImageUrl(`${API_BASE}${item.image_url}`)}
                               />
                             ) : null}
                             <strong>{item.name}</strong> × {item.quantity}
@@ -1056,6 +1071,29 @@ export default function HomePage() {
       </section>
 
       <button className="fab" onClick={() => setShowForm(true)} aria-label="新增物品">＋</button>
+
+      {previewImageUrl ? (
+        <div
+          onClick={() => setPreviewImageUrl(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.72)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 16
+          }}
+        >
+          <img
+            src={previewImageUrl}
+            alt="preview"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 12, objectFit: "contain" }}
+          />
+        </div>
+      ) : null}
     </main>
   );
 }
