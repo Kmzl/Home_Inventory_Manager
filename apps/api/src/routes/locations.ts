@@ -10,6 +10,13 @@ const createLocationSchema = z.object({
   imageUrl: z.string().nullable().optional()
 });
 
+const updateLocationSchema = z.object({
+  name: z.string().min(1).optional(),
+  alias: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional()
+});
+
 export async function locationRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/locations", async () => {
     const rows = app.db
@@ -52,6 +59,47 @@ export async function locationRoutes(app: FastifyInstance): Promise<void> {
 
     const location = app.db.prepare(`SELECT * FROM locations WHERE id = ?`).get(result.lastInsertRowid);
     reply.code(201);
+    return { location };
+  });
+
+  app.patch("/api/locations/:id", async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+    const patch = updateLocationSchema.parse(request.body);
+
+    const existing = app.db.prepare(`SELECT * FROM locations WHERE id = ?`).get(params.id) as
+      | { id: number; name: string; alias: string | null; note: string | null; image_url: string | null; path: string | null }
+      | undefined;
+
+    if (!existing) {
+      reply.code(404);
+      return { error: "Location not found" };
+    }
+
+    const nextName = patch.name ?? existing.name;
+    const pathParts = (existing.path ?? existing.name).split(" / ");
+    pathParts[pathParts.length - 1] = nextName;
+    const nextPath = pathParts.join(" / ");
+
+    app.db
+      .prepare(
+        `UPDATE locations
+         SET name=@name,
+             alias=@alias,
+             note=@note,
+             image_url=@imageUrl,
+             path=@path
+         WHERE id=@id`
+      )
+      .run({
+        id: params.id,
+        name: nextName,
+        alias: patch.alias !== undefined ? patch.alias : existing.alias,
+        note: patch.note !== undefined ? patch.note : existing.note,
+        imageUrl: patch.imageUrl !== undefined ? patch.imageUrl : existing.image_url,
+        path: nextPath
+      });
+
+    const location = app.db.prepare(`SELECT * FROM locations WHERE id = ?`).get(params.id);
     return { location };
   });
 }

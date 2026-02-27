@@ -453,6 +453,26 @@ export default function HomePage() {
     alert("恢复完成，建议刷新页面确认数据状态。");
   };
 
+  const updateItemImage = async (itemId: number, imageUrl: string | null) => {
+    const res = await fetch(`${API_BASE}/api/items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl })
+    });
+    if (!res.ok) return setError("更新物品图片失败");
+    await loadData();
+  };
+
+  const updateLocationImage = async (locationId: number, imageUrl: string | null) => {
+    const res = await fetch(`${API_BASE}/api/locations/${locationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl })
+    });
+    if (!res.ok) return setError("更新位置图片失败");
+    await loadData();
+  };
+
   const createLocation = async (e: FormEvent) => {
     e.preventDefault();
     if (!locationForm.name.trim()) return;
@@ -597,9 +617,29 @@ export default function HomePage() {
                 <strong>L{l.level}</strong> · {l.path || l.name}
                 <div className="item-meta">NFC URL: /nfc/{l.id}</div>
               </div>
-              <a href={`/nfc/${l.id}`} target="_blank" rel="noreferrer">
-                <button className="secondary">打开 NFC 页</button>
-              </a>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    try {
+                      const url = await uploadImageFile(f, "location");
+                      await updateLocationImage(l.id, url);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "位置图片上传失败");
+                    }
+                  }}
+                />
+                {l.image_url ? (
+                  <button className="danger" onClick={() => void updateLocationImage(l.id, null)}>移除图</button>
+                ) : null}
+                <a href={`/nfc/${l.id}`} target="_blank" rel="noreferrer">
+                  <button className="secondary">打开 NFC 页</button>
+                </a>
+              </div>
             </li>
           ))}
         </ul>
@@ -904,7 +944,7 @@ export default function HomePage() {
                               .join(" ｜ ") || "无附加信息"}
                           </div>
 
-                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                             <button
                               className="secondary"
                               onClick={() => {
@@ -918,6 +958,24 @@ export default function HomePage() {
                             >
                               {expandedItemId === item.id ? "收起分布" : "展开分布"}
                             </button>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={async (e) => {
+                                const f = e.target.files?.[0];
+                                if (!f) return;
+                                try {
+                                  const url = await uploadImageFile(f, "item");
+                                  await updateItemImage(item.id, url);
+                                } catch (err) {
+                                  setError(err instanceof Error ? err.message : "物品图片上传失败");
+                                }
+                              }}
+                            />
+                            {item.image_url ? (
+                              <button className="danger" onClick={() => void updateItemImage(item.id, null)}>移除图</button>
+                            ) : null}
                             <button className="danger" onClick={() => void softDelete(item.id)}>移入回收站</button>
                           </div>
 
