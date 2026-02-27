@@ -123,14 +123,29 @@ export default function HomePage() {
 
   const uploadImageFile = async (file: File, targetType: "item" | "location") => {
     const dataBase64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = String(reader.result || "");
-        const base64 = result.includes(",") ? result.split(",")[1] : result;
-        resolve(base64);
+      const img = new Image();
+      const fr = new FileReader();
+      fr.onload = () => {
+        img.onload = () => {
+          const maxW = 1600;
+          const scale = Math.min(1, maxW / img.width);
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("图片处理失败"));
+          ctx.drawImage(img, 0, 0, w, h);
+          const out = canvas.toDataURL("image/jpeg", 0.78);
+          const base64 = out.includes(",") ? out.split(",")[1] : out;
+          resolve(base64);
+        };
+        img.onerror = () => reject(new Error("图片读取失败"));
+        img.src = String(fr.result || "");
       };
-      reader.onerror = () => reject(new Error("图片读取失败"));
-      reader.readAsDataURL(file);
+      fr.onerror = () => reject(new Error("图片读取失败"));
+      fr.readAsDataURL(file);
     });
 
     const res = await fetch(`${API_BASE}/api/upload-image`, {
@@ -564,6 +579,14 @@ export default function HomePage() {
               }
             }}
           />
+          {locationForm.imageUrl ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <a href={`${API_BASE}${locationForm.imageUrl}`} target="_blank" rel="noreferrer">
+                <img src={`${API_BASE}${locationForm.imageUrl}`} alt="位置预览" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8 }} />
+              </a>
+              <button className="danger" type="button" onClick={() => setLocationForm((p) => ({ ...p, imageUrl: "" }))}>移除图片</button>
+            </div>
+          ) : null}
           <button className="full" type="submit">新增位置</button>
         </form>
         <ul className="list" style={{ marginTop: 10 }}>
@@ -822,6 +845,14 @@ export default function HomePage() {
                 }
               }}
             />
+            {form.imageUrl ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <a href={`${API_BASE}${form.imageUrl}`} target="_blank" rel="noreferrer">
+                  <img src={`${API_BASE}${form.imageUrl}`} alt="物品预览" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8 }} />
+                </a>
+                <button className="danger" type="button" onClick={() => setForm((p) => ({ ...p, imageUrl: "" }))}>移除图片</button>
+              </div>
+            ) : null}
             <button className="full" type="submit">创建物品</button>
           </form>
         ) : null}
