@@ -9,6 +9,7 @@ type Item = {
   location: string | null;
   quantity: number;
   note: string | null;
+  image_url?: string | null;
   deleted_at: string | null;
   category_sort_order?: number;
   risk_priority?: number;
@@ -37,6 +38,7 @@ type LocationItem = {
   level: number;
   name: string;
   path: string | null;
+  image_url?: string | null;
 };
 
 type ImportRow = {
@@ -64,7 +66,10 @@ type CategoryItem = {
   item_count: number;
 };
 
-const API_BASE = "http://localhost:3001";
+const API_BASE =
+  typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3001`
+    : "http://localhost:3001";
 
 export default function HomePage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -75,7 +80,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"active" | "trash">("active");
   const [showForm, setShowForm] = useState(true);
-  const [locationForm, setLocationForm] = useState({ name: "", level: 1, parentId: "" });
+  const [locationForm, setLocationForm] = useState({ name: "", level: 1, parentId: "", imageUrl: "" });
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [itemLocations, setItemLocations] = useState<Record<number, Array<{ location_id: number; quantity: number; path: string | null }>>>({});
   const [distForm, setDistForm] = useState<{ itemId: number; locationId: string; quantity: string } | null>(null);
@@ -112,8 +117,36 @@ export default function HomePage() {
     validDaysAfterOpen: "",
     remindDays: "7",
     lowStockThreshold: "",
-    primaryLocationId: ""
+    primaryLocationId: "",
+    imageUrl: ""
   });
+
+  const uploadImageFile = async (file: File, targetType: "item" | "location") => {
+    const dataBase64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error("图片读取失败"));
+      reader.readAsDataURL(file);
+    });
+
+    const res = await fetch(`${API_BASE}/api/upload-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type || "image/jpeg",
+        dataBase64,
+        targetType
+      })
+    });
+    if (!res.ok) throw new Error("图片上传失败");
+    const json = await res.json();
+    return String(json.url || "");
+  };
 
   const loadData = async () => {
     try {
@@ -179,7 +212,8 @@ export default function HomePage() {
           validDaysAfterOpen: form.validDaysAfterOpen ? Number(form.validDaysAfterOpen) : null,
           remindDays: form.remindDays ? Number(form.remindDays) : 7,
           lowStockThreshold: form.lowStockThreshold ? Number(form.lowStockThreshold) : null,
-          primaryLocationId: form.primaryLocationId ? Number(form.primaryLocationId) : null
+          primaryLocationId: form.primaryLocationId ? Number(form.primaryLocationId) : null,
+          imageUrl: form.imageUrl || null
         })
       });
       if (!res.ok) throw new Error("新增失败");
@@ -194,7 +228,8 @@ export default function HomePage() {
         validDaysAfterOpen: "",
         remindDays: "7",
         lowStockThreshold: "",
-        primaryLocationId: ""
+        primaryLocationId: "",
+        imageUrl: ""
       });
       setShowForm(false);
       await loadData();
@@ -413,12 +448,13 @@ export default function HomePage() {
       body: JSON.stringify({
         name: locationForm.name,
         level: Number(locationForm.level),
-        parentId: locationForm.parentId ? Number(locationForm.parentId) : null
+        parentId: locationForm.parentId ? Number(locationForm.parentId) : null,
+        imageUrl: locationForm.imageUrl || null
       })
     });
 
     if (!res.ok) return setError("创建位置失败");
-    setLocationForm({ name: "", level: 1, parentId: "" });
+    setLocationForm({ name: "", level: 1, parentId: "", imageUrl: "" });
     await loadData();
   };
 
@@ -513,12 +549,28 @@ export default function HomePage() {
                 <option key={l.id} value={String(l.id)}>{l.path || l.name}</option>
               ))}
           </select>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              try {
+                const url = await uploadImageFile(f, "location");
+                setLocationForm((prev) => ({ ...prev, imageUrl: url }));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "位置图片上传失败");
+              }
+            }}
+          />
           <button className="full" type="submit">新增位置</button>
         </form>
         <ul className="list" style={{ marginTop: 10 }}>
           {locations.map((l) => (
             <li className="item-row" key={l.id}>
               <div>
+                {l.image_url ? <img src={`${API_BASE}${l.image_url}`} alt={l.name} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, marginRight: 8 }} /> : null}
                 <strong>L{l.level}</strong> · {l.path || l.name}
                 <div className="item-meta">NFC URL: /nfc/{l.id}</div>
               </div>
@@ -755,6 +807,21 @@ export default function HomePage() {
             <input placeholder="开封后有效天数" type="number" min={1} value={form.validDaysAfterOpen} onChange={(e) => setForm({ ...form, validDaysAfterOpen: e.target.value })} />
             <input placeholder="提前提醒天数" type="number" min={1} value={form.remindDays} onChange={(e) => setForm({ ...form, remindDays: e.target.value })} />
             <input placeholder="低库存阈值" type="number" min={0} value={form.lowStockThreshold} onChange={(e) => setForm({ ...form, lowStockThreshold: e.target.value })} />
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                try {
+                  const url = await uploadImageFile(f, "item");
+                  setForm((prev) => ({ ...prev, imageUrl: url }));
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "物品图片上传失败");
+                }
+              }}
+            />
             <button className="full" type="submit">创建物品</button>
           </form>
         ) : null}
@@ -780,7 +847,16 @@ export default function HomePage() {
                     {group.map((item) => (
                       <li className="item-row" key={item.id}>
                         <div style={{ width: "100%" }}>
-                          <strong>{item.name}</strong> × {item.quantity}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {item.image_url ? (
+                              <img
+                                src={`${API_BASE}${item.image_url}`}
+                                alt={item.name}
+                                style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8 }}
+                              />
+                            ) : null}
+                            <strong>{item.name}</strong> × {item.quantity}
+                          </div>
                           <div className="item-meta">
                             {[
                               item.risk_priority === 3

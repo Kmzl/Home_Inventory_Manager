@@ -13,6 +13,7 @@ import { aiSearchRoutes } from "./routes/ai-search.js";
 import { pushConfigRoutes } from "./routes/push-config.js";
 import { pushStatusRoutes } from "./routes/push-status.js";
 import { backupRoutes } from "./routes/backup.js";
+import { uploadRoutes } from "./routes/upload.js";
 import { startPushScheduler } from "./plugins/push-scheduler.js";
 import { startBackupScheduler } from "./plugins/backup-scheduler.js";
 
@@ -28,10 +29,10 @@ declare module "fastify" {
 }
 
 export async function buildServer(options: BuildServerOptions): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, bodyLimit: 20 * 1024 * 1024 });
 
   await app.register(cors, {
-    origin: ["http://localhost:3000"]
+    origin: true
   });
 
   const dbPath = resolveDatabasePath(options.databaseUrl);
@@ -55,6 +56,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(pushConfigRoutes);
   await app.register(pushStatusRoutes);
   await app.register(backupRoutes);
+  await app.register(uploadRoutes);
 
   const pushSchedulerTimer = startPushScheduler(app);
   const backupSchedulerTimer = startBackupScheduler(app);

@@ -6,13 +6,14 @@ const createLocationSchema = z.object({
   parentId: z.number().int().positive().nullable().optional(),
   level: z.number().int().min(1).max(3),
   alias: z.string().nullable().optional(),
-  note: z.string().nullable().optional()
+  note: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional()
 });
 
 export async function locationRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/locations", async () => {
     const rows = app.db
-      .prepare(`SELECT id,parent_id,level,name,alias,note,path,created_at FROM locations ORDER BY level ASC, id ASC`)
+      .prepare(`SELECT id,parent_id,level,name,alias,note,image_url,path,created_at FROM locations ORDER BY level ASC, id ASC`)
       .all();
     return { locations: rows };
   });
@@ -36,8 +37,8 @@ export async function locationRoutes(app: FastifyInstance): Promise<void> {
 
     const result = app.db
       .prepare(
-        `INSERT INTO locations (parent_id, level, name, alias, note, path)
-         VALUES (@parentId, @level, @name, @alias, @note, @path)`
+        `INSERT INTO locations (parent_id, level, name, alias, note, image_url, path)
+         VALUES (@parentId, @level, @name, @alias, @note, @imageUrl, @path)`
       )
       .run({
         parentId: body.parentId ?? null,
@@ -45,6 +46,7 @@ export async function locationRoutes(app: FastifyInstance): Promise<void> {
         name: body.name,
         alias: body.alias ?? null,
         note: body.note ?? null,
+        imageUrl: body.imageUrl ?? null,
         path
       });
 
