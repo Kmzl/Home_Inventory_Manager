@@ -1,0 +1,69 @@
+import Fastify, { type FastifyInstance } from "fastify";
+import cors from "@fastify/cors";
+import { createDb, resolveDatabasePath, type DbInstance } from "./plugins/db.js";
+import { healthRoutes } from "./routes/health.js";
+import { itemRoutes } from "./routes/items.js";
+import { locationRoutes } from "./routes/locations.js";
+import { riskRoutes } from "./routes/risks.js";
+import { importRoutes } from "./routes/import.js";
+import { categoryRoutes } from "./routes/categories.js";
+import { nfcRoutes } from "./routes/nfc.js";
+import { pushRoutes } from "./routes/push.js";
+import { aiSearchRoutes } from "./routes/ai-search.js";
+import { pushConfigRoutes } from "./routes/push-config.js";
+import { pushStatusRoutes } from "./routes/push-status.js";
+import { backupRoutes } from "./routes/backup.js";
+import { uploadRoutes } from "./routes/upload.js";
+import { startPushScheduler } from "./plugins/push-scheduler.js";
+import { startBackupScheduler } from "./plugins/backup-scheduler.js";
+
+export type BuildServerOptions = {
+  databaseUrl: string;
+};
+
+declare module "fastify" {
+  interface FastifyInstance {
+    db: DbInstance;
+    dbPath: string;
+  }
+}
+
+export async function buildServer(options: BuildServerOptions): Promise<FastifyInstance> {
+  const app = Fastify({ logger: true, bodyLimit: 20 * 1024 * 1024 });
+
+  await app.register(cors, {
+    origin: true
+  });
+
+  const dbPath = resolveDatabasePath(options.databaseUrl);
+  const db = createDb(options.databaseUrl);
+  app.decorate("db", db);
+  app.decorate("dbPath", dbPath);
+
+  app.addHook("onClose", async () => {
+    app.db.close();
+  });
+
+  await app.register(healthRoutes);
+  await app.register(locationRoutes);
+  await app.register(itemRoutes);
+  await app.register(riskRoutes);
+  await app.register(importRoutes);
+  await app.register(categoryRoutes);
+  await app.register(nfcRoutes);
+  await app.register(pushRoutes);
+  await app.register(aiSearchRoutes);
+  await app.register(pushConfigRoutes);
+  await app.register(pushStatusRoutes);
+  await app.register(backupRoutes);
+  await app.register(uploadRoutes);
+
+  const pushSchedulerTimer = startPushScheduler(app);
+  const backupSchedulerTimer = startBackupScheduler(app);
+  app.addHook("onClose", async () => {
+    clearInterval(pushSchedulerTimer);
+    clearInterval(backupSchedulerTimer);
+  });
+
+  return app;
+}

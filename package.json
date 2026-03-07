@@ -1,0 +1,16 @@
+{
+  "name": "home-inventory-mvp",
+  "private": true,
+  "packageManager": "pnpm@10.6.1",
+  "engines": {
+    "node": "22.x",
+    "pnpm": ">=10.6.1"
+  },
+  "scripts": {
+    "preinstall": "node ./scripts/check-node.mjs",
+    "dev": "pnpm --parallel --filter @home-inventory/api --filter @home-inventory/web dev",
+    "build": "pnpm --filter @home-inventory/api --filter @home-inventory/web build",
+    "typecheck": "pnpm --filter @home-inventory/api --filter @home-inventory/web typecheck",
+    "lint": "pnpm --filter @home-inventory/api --filter @home-inventory/web lint"
+  }
+}

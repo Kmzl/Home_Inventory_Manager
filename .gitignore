@@ -1,0 +1,9 @@
+node_modules
+.pnpm-store
+.next
+dist
+.env
+apps/api/.env
+*.tsbuildinfo
+data/*.db
+data/*.db-*
