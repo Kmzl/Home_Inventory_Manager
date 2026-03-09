@@ -16,9 +16,9 @@ pnpm install
 pnpm dev
 ```
 
-- Web: http://192.168.8.201:3000
-- API: http://192.168.8.201:3001
-- Health: http://192.168.8.201:3001/health
+- Web: http://localhost:3000
+- API: http://localhost:3001
+- Health: http://localhost:3001/health
 
 数据库默认路径：`data/app.db`（启动时自动创建目录和文件）。
 
